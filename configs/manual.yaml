@@ -1,0 +1,14 @@
+# Manual "reasonable small-object" policy for comparison with adaptive mode.
+mosaic: 0.6
+close_mosaic: 10
+mixup: 0.0
+cutmix: 0.0
+hsv_h: 0.015
+hsv_s: 0.55
+hsv_v: 0.45
+degrees: 5.0
+translate: 0.06
+scale: 0.35
+perspective: 0.0
+fliplr: 0.5
+flipud: 0.0

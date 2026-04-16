@@ -1,0 +1,67 @@
+project:
+  name: "small_objects_auto_aug_mvp"
+  seed: 42
+  deterministic: true
+
+dataset:
+  root: "./datasets/visdrone_yolo"
+  mode: "manual"  # manual | auto
+  splits:
+    - "train"
+    - "val"
+  image_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+  visdrone_classes:
+    - "pedestrian"
+    - "people"
+    - "bicycle"
+    - "car"
+    - "van"
+    - "truck"
+    - "tricycle"
+    - "awning-tricycle"
+    - "bus"
+    - "motor"
+
+analysis:
+  small_max_area: 1024.0          # 32^2
+  medium_max_area: 9216.0         # 96^2
+  tiny_max_area: 256.0            # 16^2
+  generate_plots: true
+
+policy:
+  small_ratio_threshold: 0.5
+  dense_objects_per_image_threshold: 15.0
+  dense_objects_per_mpix_threshold: 30.0
+  illum_v_std_threshold: 35.0
+  imbalance_ratio_threshold: 10.0
+  small_imbalance_ratio_threshold: 6.0
+  allow_flipud: false
+  enable_mixup_cutmix: false
+  low_variability_vstd_threshold: 14.0
+  bbox_crop_min_visibility: 0.30
+  bbox_crop_min_area: 16.0
+  bbox_copy_paste_ioa_threshold: 0.30
+  bbox_copy_paste_max_pastes: 3
+
+training:
+  model: "yolo26n.pt"
+  data_yaml: "./datasets/visdrone_yolo/visdrone.yaml"
+  epochs_fast: 20
+  epochs_final: 100
+  imgsz: 640
+  batch: 16
+  device: null
+  workers: 4
+  fraction_fast: 0.2
+  project_dir: "./runs"
+  baseline_disable_albumentations: true
+  rect: false
+  multi_scale: false
+
+evaluation:
+  iou_type: "bbox"
+  use_tiny_eval: true
