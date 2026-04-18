@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -122,6 +123,208 @@ def save_validation_report(report: dict, output_path: str | Path) -> None:
     dump_json(report, output_path)
 
 
+def _resolve_visdrone_split_dir(raw_root: Path, split: str) -> Path | None:
+    """
+    Resolve source directory for a split in raw VisDrone layout.
+
+    Supported examples:
+    - <raw_root>/VisDrone2019-DET-train
+    - <raw_root>/VisDrone2019-DET-val
+    - <raw_root>/VisDrone2019-DET-test-dev
+    - nested locations with those names
+    """
+    names_by_split = {
+        "train": ["VisDrone2019-DET-train", "train"],
+        "val": ["VisDrone2019-DET-val", "val"],
+        "test": ["VisDrone2019-DET-test-dev", "VisDrone2019-DET-test-challenge", "test"],
+    }
+    names = names_by_split.get(split, [split])
+
+    for name in names:
+        candidate = raw_root / name
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+
+    for name in names:
+        matches = list(raw_root.rglob(name))
+        for match in matches:
+            if match.exists() and match.is_dir():
+                return match
+    return None
+
+
+def _image_size(image_path: Path) -> tuple[int, int]:
+    """Return image size as (width, height)."""
+    try:
+        from PIL import Image
+    except Exception:
+        Image = None
+
+    if Image is not None:
+        with Image.open(image_path) as im:
+            return int(im.width), int(im.height)
+
+    # Fallback: OpenCV
+    import cv2
+
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise FileNotFoundError(f"Failed to read image for size: {image_path.as_posix()}")
+    height, width = image.shape[:2]
+    return int(width), int(height)
+
+
+def _convert_annotation_row_to_yolo(
+    row: list[str],
+    width: int,
+    height: int,
+) -> str | None:
+    """
+    Convert one VisDrone annotation row to YOLO string.
+
+    VisDrone row format (DET):
+      bbox_left,bbox_top,bbox_width,bbox_height,score,category,truncation,occlusion
+    """
+    if len(row) < 6:
+        return None
+
+    # Skip ignored regions.
+    if row[4].strip() == "0":
+        return None
+
+    x, y, w, h = map(float, row[:4])
+    class_id = int(row[5]) - 1  # VisDrone class ids are 1..10 for valid objects
+    if class_id < 0:
+        return None
+
+    dw = 1.0 / max(1.0, float(width))
+    dh = 1.0 / max(1.0, float(height))
+    x_center = (x + w / 2.0) * dw
+    y_center = (y + h / 2.0) * dh
+    w_norm = w * dw
+    h_norm = h * dh
+    return f"{class_id} {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n"
+
+
+def _convert_visdrone_split_to_yolo(
+    source_dir: Path,
+    output_root: Path,
+    split: str,
+) -> tuple[int, int]:
+    """
+    Convert one split from raw VisDrone format to YOLO format.
+
+    Returns:
+        (num_images_copied, num_labels_written)
+    """
+    source_images_dir = source_dir / "images"
+    source_annotations_dir = source_dir / "annotations"
+    if not source_images_dir.exists():
+        raise FileNotFoundError(f"Missing source images dir: {source_images_dir.as_posix()}")
+
+    images_dir = output_root / "images" / split
+    labels_dir = output_root / "labels" / split
+    images_dir.mkdir(parents=True, exist_ok=True)
+    labels_dir.mkdir(parents=True, exist_ok=True)
+
+    copied_images = 0
+    for image_path in source_images_dir.glob("*.jpg"):
+        target_path = images_dir / image_path.name
+        if not target_path.exists():
+            shutil.copy2(image_path, target_path)
+            copied_images += 1
+
+    written_labels = 0
+    if source_annotations_dir.exists():
+        for ann_path in sorted(source_annotations_dir.glob("*.txt")):
+            image_path = images_dir / ann_path.with_suffix(".jpg").name
+            if not image_path.exists():
+                # Fallback for png extension
+                image_path = images_dir / ann_path.with_suffix(".png").name
+            if not image_path.exists():
+                continue
+
+            width, height = _image_size(image_path)
+            lines: list[str] = []
+            with ann_path.open("r", encoding="utf-8") as file:
+                for raw_line in file.read().strip().splitlines():
+                    if not raw_line.strip():
+                        continue
+                    yolo_line = _convert_annotation_row_to_yolo(
+                        row=[x.strip() for x in raw_line.split(",")],
+                        width=width,
+                        height=height,
+                    )
+                    if yolo_line is not None:
+                        lines.append(yolo_line)
+            (labels_dir / ann_path.name).write_text("".join(lines), encoding="utf-8")
+            written_labels += 1
+
+    return copied_images, written_labels
+
+
+def _write_visdrone_data_yaml(output_root: Path) -> None:
+    """Write a minimal VisDrone-compatible data.yaml for training convenience."""
+    names = {
+        0: "pedestrian",
+        1: "people",
+        2: "bicycle",
+        3: "car",
+        4: "van",
+        5: "truck",
+        6: "tricycle",
+        7: "awning-tricycle",
+        8: "bus",
+        9: "motor",
+    }
+    yaml_content = {
+        "path": output_root.as_posix(),
+        "train": "images/train",
+        "val": "images/val",
+        "test": "images/test",
+        "names": names,
+    }
+    try:
+        import yaml
+    except Exception:
+        return
+    (output_root / "visdrone.yaml").write_text(
+        yaml.safe_dump(yaml_content, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+
+def _convert_visdrone_without_ultralytics(raw_root: Path, output_root: Path) -> None:
+    """Internal robust converter used when Ultralytics converter function is unavailable."""
+    output_root.mkdir(parents=True, exist_ok=True)
+    total_images = 0
+    total_labels = 0
+
+    for split in ("train", "val", "test"):
+        source_dir = _resolve_visdrone_split_dir(raw_root, split=split)
+        if source_dir is None:
+            continue
+        copied_images, written_labels = _convert_visdrone_split_to_yolo(
+            source_dir=source_dir,
+            output_root=output_root,
+            split=split,
+        )
+        total_images += copied_images
+        total_labels += written_labels
+
+    if not (output_root / "images" / "train").exists() or not (output_root / "images" / "val").exists():
+        raise FileNotFoundError(
+            "Failed to build train/val splits from raw VisDrone. "
+            f"Checked raw root: {raw_root.as_posix()}"
+        )
+
+    _write_visdrone_data_yaml(output_root)
+    print(
+        f"[prepare_visdrone_auto] Fallback conversion complete: images_copied={total_images}, "
+        f"labels_written={total_labels}, output={output_root.as_posix()}"
+    )
+
+
 def prepare_visdrone_auto(raw_visdrone_root: str | Path, output_root: str | Path) -> None:
     """
     Try to trigger Ultralytics VisDrone conversion in "auto" mode.
@@ -135,27 +338,32 @@ def prepare_visdrone_auto(raw_visdrone_root: str | Path, output_root: str | Path
 
     try:
         from ultralytics.data.converter import convert_visdrone
-    except Exception as exc:
-        raise RuntimeError(
-            "Ultralytics converter is unavailable. Install ultralytics and retry."
-        ) from exc
+    except Exception:
+        convert_visdrone = None
 
-    signature = inspect.signature(convert_visdrone)
-    kwargs = {}
-    for candidate in ("path", "root", "root_dir", "dataset_dir", "dir"):
-        if candidate in signature.parameters:
-            kwargs[candidate] = str(raw_visdrone_root)
-            break
-
-    for candidate in ("save_dir", "output_dir", "output"):
-        if candidate in signature.parameters:
-            kwargs[candidate] = str(output_root)
-            break
-
-    if not kwargs:
-        # Fallback when converter expects positional args only.
-        convert_visdrone(str(raw_visdrone_root))
+    if convert_visdrone is None:
+        _convert_visdrone_without_ultralytics(raw_root=raw_visdrone_root, output_root=output_root)
         return
 
-    convert_visdrone(**kwargs)
+    try:
+        signature = inspect.signature(convert_visdrone)
+        kwargs = {}
+        for candidate in ("path", "root", "root_dir", "dataset_dir", "dir"):
+            if candidate in signature.parameters:
+                kwargs[candidate] = str(raw_visdrone_root)
+                break
 
+        for candidate in ("save_dir", "output_dir", "output"):
+            if candidate in signature.parameters:
+                kwargs[candidate] = str(output_root)
+                break
+
+        if not kwargs:
+            # Fallback when converter expects positional args only.
+            convert_visdrone(str(raw_visdrone_root))
+            return
+
+        convert_visdrone(**kwargs)
+    except Exception:
+        # Last-resort stable path: local converter logic.
+        _convert_visdrone_without_ultralytics(raw_root=raw_visdrone_root, output_root=output_root)
