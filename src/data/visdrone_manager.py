@@ -62,8 +62,19 @@ def validate_yolo_split(
         result.orphan_labels.append(f"Missing directory: {labels_dir.as_posix()}")
         return result
 
-    images = _find_images(images_dir, image_extensions=image_extensions)
-    labels = sorted(labels_dir.glob("*.txt"))
+    try:
+        images = _find_images(images_dir, image_extensions=image_extensions)
+    except OSError as exc:
+        result.num_unreadable_label_files += 1
+        result.unreadable_labels.append(f"images_dir: {images_dir.as_posix()} ({exc})")
+        return result
+
+    try:
+        labels = sorted(labels_dir.glob("*.txt"))
+    except OSError as exc:
+        result.num_unreadable_label_files += 1
+        result.unreadable_labels.append(f"labels_dir: {labels_dir.as_posix()} ({exc})")
+        return result
 
     result.num_images = len(images)
     result.num_label_files = len(labels)
