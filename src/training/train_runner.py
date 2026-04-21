@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,41 @@ class TrainRunConfig:
     rect: bool = False
     multi_scale: bool = False
     baseline_disable_albumentations: bool = True
+    plots: bool = False
+
+
+def _to_yaml_safe(value: Any) -> Any:
+    """Convert nested runtime objects to YAML-safe values for debug dumps."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, Path):
+        return value.as_posix()
+
+    if isinstance(value, dict):
+        return {str(key): _to_yaml_safe(val) for key, val in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_to_yaml_safe(item) for item in value]
+
+    if is_dataclass(value):
+        payload: dict[str, Any] = {"__class__": value.__class__.__name__}
+        for field in fields(value):
+            # Skip private runtime internals (e.g. compiled objects, RNGs).
+            if field.name.startswith("_"):
+                continue
+            try:
+                field_value = getattr(value, field.name)
+            except Exception:
+                continue
+            payload[field.name] = _to_yaml_safe(field_value)
+        return payload
+
+    # Fallback for callables/complex objects (Albumentations/custom transform wrappers).
+    return {
+        "__class__": value.__class__.__name__,
+        "repr": repr(value),
+    }
 
 
 def _ultralytics_yolo():
@@ -59,6 +94,7 @@ def _default_train_args(config: TrainRunConfig) -> dict[str, Any]:
         "deterministic": config.deterministic,
         "rect": config.rect,
         "multi_scale": config.multi_scale,
+        "plots": config.plots,
         "exist_ok": False,
     }
     return args
@@ -106,7 +142,14 @@ def run_train_mode(
 
     save_dir = Path(getattr(results, "save_dir", Path(config.project_dir) / mode))
     save_dir.mkdir(parents=True, exist_ok=True)
-    dump_yaml(train_args, save_dir / "train_args.yaml")
+    try:
+        dump_yaml(_to_yaml_safe(train_args), save_dir / "train_args.yaml")
+    except Exception as exc:
+        LOGGER.warning(
+            "Failed to dump train args for mode '%s' due to serialization error: %s",
+            mode,
+            exc,
+        )
     LOGGER.info("Mode '%s' completed. Artifacts saved to %s", mode, save_dir.as_posix())
     return save_dir
 
@@ -218,4 +261,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

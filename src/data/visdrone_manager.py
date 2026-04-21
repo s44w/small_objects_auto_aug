@@ -193,16 +193,35 @@ def _convert_annotation_row_to_yolo(
         return None
 
     x, y, w, h = map(float, row[:4])
-    class_id = int(row[5]) - 1  # VisDrone class ids are 1..10 for valid objects
-    if class_id < 0:
+    class_id = int(float(row[5])) - 1  # VisDrone class ids are 1..10 for valid objects
+    if class_id < 0 or class_id > 9:
+        return None
+
+    # Clip raw boxes to image bounds before normalization.
+    x1 = max(0.0, min(float(width), x))
+    y1 = max(0.0, min(float(height), y))
+    x2 = max(0.0, min(float(width), x + w))
+    y2 = max(0.0, min(float(height), y + h))
+    bw = x2 - x1
+    bh = y2 - y1
+    if bw <= 1e-6 or bh <= 1e-6:
         return None
 
     dw = 1.0 / max(1.0, float(width))
     dh = 1.0 / max(1.0, float(height))
-    x_center = (x + w / 2.0) * dw
-    y_center = (y + h / 2.0) * dh
-    w_norm = w * dw
-    h_norm = h * dh
+    x_center = (x1 + bw / 2.0) * dw
+    y_center = (y1 + bh / 2.0) * dh
+    w_norm = bw * dw
+    h_norm = bh * dh
+
+    # Final safety clamp to valid normalized range.
+    x_center = min(max(x_center, 0.0), 1.0)
+    y_center = min(max(y_center, 0.0), 1.0)
+    w_norm = min(max(w_norm, 0.0), 1.0)
+    h_norm = min(max(h_norm, 0.0), 1.0)
+    if w_norm <= 0.0 or h_norm <= 0.0:
+        return None
+
     return f"{class_id} {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n"
 
 
