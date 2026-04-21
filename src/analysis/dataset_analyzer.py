@@ -35,6 +35,8 @@ class DatasetAnalyzerConfig:
     tiny_max_area: float = TINY_MAX_AREA_DEFAULT
     image_extensions: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".bmp")
     generate_plots: bool = True
+    show_progress: bool = True
+    progress_log_every: int = 250
 
 
 def _safe_describe(values: list[float]) -> dict[str, float]:
@@ -134,7 +136,25 @@ def _analyze_split(
     large_count = 0
     empty_labels_count = 0
 
-    for image_path in image_paths:
+    iterator: Iterable[Path]
+    progress_bar = None
+    if config.show_progress:
+        try:
+            from tqdm.auto import tqdm
+
+            progress_bar = tqdm(
+                image_paths,
+                total=len(image_paths),
+                desc=f"Analyze {split}",
+                unit="img",
+            )
+            iterator = progress_bar
+        except Exception:
+            iterator = image_paths
+    else:
+        iterator = image_paths
+
+    for index, image_path in enumerate(iterator, start=1):
         image = cv2.imread(str(image_path))
         if image is None:
             LOGGER.warning("Failed to load image: %s", image_path.as_posix())
@@ -186,6 +206,12 @@ def _analyze_split(
 
         objects_per_image.append(float(object_count))
         objects_per_mpix.append(float(object_count) / max(mpix, 1e-6))
+
+        if progress_bar is None and config.show_progress and index % max(1, config.progress_log_every) == 0:
+            print(f"[analyze:{split}] processed {index}/{len(image_paths)} images")
+
+    if progress_bar is not None:
+        progress_bar.close()
 
     num_objects = int(sum(class_counts.values()))
     small_ratio = float(small_count) / max(1, num_objects)
