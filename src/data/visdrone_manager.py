@@ -20,10 +20,12 @@ class SplitValidationResult:
     num_label_files: int = 0
     num_images_with_labels: int = 0
     num_empty_label_files: int = 0
+    num_unreadable_label_files: int = 0
     num_missing_labels: int = 0
     num_orphan_labels: int = 0
     missing_labels: list[str] = field(default_factory=list)
     orphan_labels: list[str] = field(default_factory=list)
+    unreadable_labels: list[str] = field(default_factory=list)
 
 
 def _find_images(images_dir: Path, image_extensions: tuple[str, ...]) -> list[Path]:
@@ -80,12 +82,18 @@ def validate_yolo_split(
     result.orphan_labels = [f"{stem}.txt" for stem in orphan]
 
     for label_path in labels:
-        if label_path.stat().st_size == 0:
-            result.num_empty_label_files += 1
-            continue
-        with label_path.open("r", encoding="utf-8") as file:
-            if not any(line.strip() for line in file):
+        try:
+            if label_path.stat().st_size == 0:
                 result.num_empty_label_files += 1
+                continue
+            with label_path.open("r", encoding="utf-8") as file:
+                if not any(line.strip() for line in file):
+                    result.num_empty_label_files += 1
+        except OSError as exc:
+            # Drive-mounted filesystems in Colab can intermittently abort I/O.
+            # We keep validation resilient and report unreadable files explicitly.
+            result.num_unreadable_label_files += 1
+            result.unreadable_labels.append(f"{label_path.name}: {exc}")
 
     return result
 
