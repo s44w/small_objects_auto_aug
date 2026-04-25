@@ -169,6 +169,12 @@ def _resolve_visdrone_split_dir(raw_root: Path, split: str) -> Path | None:
         for match in matches:
             if match.exists() and match.is_dir():
                 return match
+
+    # Some user exports can contain a flat root with `images/` + `annotations/`
+    # that effectively corresponds to one split (often train/test-dev). Use it
+    # as a last resort for train only to avoid producing an empty train split.
+    if split == "train" and (raw_root / "images").exists() and (raw_root / "annotations").exists():
+        return raw_root
     return None
 
 
