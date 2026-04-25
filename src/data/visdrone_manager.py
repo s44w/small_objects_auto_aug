@@ -263,8 +263,36 @@ def _convert_visdrone_split_to_yolo(
     """
     source_images_dir = source_dir / "images"
     source_annotations_dir = source_dir / "annotations"
+
     if not source_images_dir.exists():
-        raise FileNotFoundError(f"Missing source images dir: {source_images_dir.as_posix()}")
+        # Robust fallback for nested extraction layouts, e.g.
+        # <split>/<split>/images or irregular unpack trees.
+        image_candidates = [
+            p
+            for p in source_dir.rglob("images")
+            if p.is_dir()
+            and (
+                any(p.glob("*.jpg"))
+                or any(p.glob("*.jpeg"))
+                or any(p.glob("*.png"))
+            )
+        ]
+        if image_candidates:
+            # Choose the richest candidate to avoid empty placeholder dirs.
+            def _count_known_images(path: Path) -> int:
+                return (
+                    len(list(path.glob("*.jpg")))
+                    + len(list(path.glob("*.jpeg")))
+                    + len(list(path.glob("*.png")))
+                )
+
+            source_images_dir = max(image_candidates, key=_count_known_images)
+            sibling_ann = source_images_dir.parent / "annotations"
+            if sibling_ann.exists():
+                source_annotations_dir = sibling_ann
+
+    if not source_images_dir.exists():
+        raise FileNotFoundError(f"Missing source images dir: {source_dir.as_posix()}/images")
 
     images_dir = output_root / "images" / split
     labels_dir = output_root / "labels" / split
