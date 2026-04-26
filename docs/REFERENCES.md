@@ -13,6 +13,11 @@ The implementation follows `instructions.md` and the official documentation belo
   - https://github.com/cocodataset/cocoapi/tree/master/PythonAPI/pycocotools
 - COCO benchmark paper:
   - https://arxiv.org/abs/1405.0312
+- VisDrone benchmark paper:
+  - https://arxiv.org/abs/1804.07437
 - AutoAugment paper:
   - https://arxiv.org/abs/1805.09501
-
+- Scale-Aware AutoAugment for Object Detection:
+  - https://arxiv.org/abs/2103.16119
+- Select-Mosaic (dense small objects):
+  - https://www.mdpi.com/1424-8220/23/18/7749

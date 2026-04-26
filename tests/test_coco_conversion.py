@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 
 import numpy as np
 import pytest
@@ -8,13 +9,15 @@ cv2 = pytest.importorskip("cv2")
 from src.evaluation.coco_converter import convert_yolo_gt_to_coco, convert_yolo_pred_txt_to_coco
 
 
-def test_yolo_to_coco_gt_and_predictions(tmp_path: Path):
+def test_yolo_to_coco_gt_and_predictions():
+    tmp_path = Path("artifacts") / "_test_tmp" / "coco_conversion_case"
+    shutil.rmtree(tmp_path, ignore_errors=True)
     images_dir = tmp_path / "images" / "val"
     labels_dir = tmp_path / "labels" / "val"
     pred_dir = tmp_path / "preds"
-    images_dir.mkdir(parents=True)
-    labels_dir.mkdir(parents=True)
-    pred_dir.mkdir(parents=True)
+    images_dir.mkdir(parents=True, exist_ok=True)
+    labels_dir.mkdir(parents=True, exist_ok=True)
+    pred_dir.mkdir(parents=True, exist_ok=True)
 
     image = np.zeros((100, 200, 3), dtype=np.uint8)
     image_path = images_dir / "img_001.jpg"

@@ -4,8 +4,10 @@ project:
   deterministic: true
 
 dataset:
+  kind: "visdrone"  # visdrone | coco_small
   root: "./datasets/visdrone_yolo"
   mode: "manual"  # manual | auto
+  raw_root: "./datasets/visdrone_raw"  # required when mode=auto
   splits:
     - "train"
     - "val"
@@ -52,12 +54,14 @@ training:
   data_yaml: "./datasets/visdrone_yolo/visdrone.yaml"
   epochs_fast: 20
   epochs_final: 100
+  fraction_final: 1.0
   imgsz: 640
   batch: 16
   device: null
   workers: 4
   fraction_fast: 0.2
   project_dir: "./runs"
+  run_ablation: true
   baseline_disable_albumentations: true
   rect: false
   multi_scale: false
@@ -65,3 +69,5 @@ training:
 evaluation:
   iou_type: "bbox"
   use_tiny_eval: true
+  use_tta: true
+  imgsz: 960

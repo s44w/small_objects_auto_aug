@@ -61,15 +61,24 @@ With training and evaluation:
 python -m src.pipeline_mvp \
   --project-config configs/project_config.yaml \
   --run-training \
-  --run-eval \
-  --pred-labels-dir path/to/predicted/labels
+  --run-eval
 ```
+
+Notes:
+- Dataset modes are configured in `configs/project_config.yaml`:
+  - `dataset.mode=manual`: validate existing YOLO dataset.
+  - `dataset.mode=auto`: convert from `dataset.raw_root` then validate.
+- Evaluation can auto-generate predictions from the best available run
+  (`results.csv` metric `metrics/mAP50-95(B)`) when `--pred-labels-dir` is omitted.
+- Training profile can be selected via `--train-profile` (`fast`, `final`, `balanced`,
+  `quality`, `hour`, `max_quality`).
 
 ## Main Colab workflow
 
 Use notebook:
 
 - `notebooks/mvp_pipeline_colab.ipynb`
+- `notebooks/coco_small_pipeline_colab.ipynb` (COCO-small pipeline)
 
 It runs:
 1. dataset validation,
@@ -77,6 +86,19 @@ It runs:
 3. adaptive policy generation,
 4. optional training suite,
 5. COCO conversion/evaluation.
+
+## COCO-small workflow
+
+COCO-small config:
+- `configs/coco_small_config.yaml`
+
+Key idea:
+- convert COCO 2017 annotations to YOLO,
+- keep only object instances with area `<= 32^2 px`,
+- then run the same adaptive pipeline.
+
+In Colab notebook for COCO-small, the first cells download archives directly
+to Google Drive and unpack them there to avoid repeated local downloads.
 
 ## Local CPU component test (<= 30 min)
 

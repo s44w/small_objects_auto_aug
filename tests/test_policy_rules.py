@@ -21,6 +21,7 @@ def _mock_stats(
                 "class_distribution": {
                     "imbalance_ratio": imbalance_ratio,
                     "imbalance_ratio_small": imbalance_ratio_small,
+                    "small_counts": {"0": 20, "1": 3, "2": 2, "3": 1},
                 },
             }
         }
@@ -47,5 +48,6 @@ def test_rule_engine_applies_dense_and_small_safe_rules():
     assert ultra["degrees"] <= 5.0
     assert ultra["translate"] <= 0.05
     assert ultra["scale"] <= 0.30
+    copy_paste = next(item for item in policy["albumentations_spec"] if item["name"] == "BBoxCopyPaste")
+    assert copy_paste["params"]["tail_class_ids"] == [3, 2]
     assert any(rule["rule_name"] == "R_mosaic" for rule in report["fired_rules"])
-

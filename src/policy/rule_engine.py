@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,38 @@ def _extract_train_features(stats: dict) -> dict[str, float]:
     return features
 
 
+def _compute_tail_class_ids_small(
+    stats: dict,
+    quantile: float = 0.3,
+    max_tail_classes: int = 4,
+) -> list[int]:
+    """
+    Build small-object tail-class shortlist from train small_counts distribution.
+
+    This is used by bbox copy-paste donor sampling to prioritize underrepresented
+    classes when small-object imbalance is detected.
+    """
+    train_stats = stats["splits"]["train"]
+    raw_counts = train_stats["class_distribution"].get("small_counts", {})
+    parsed: list[tuple[int, int]] = []
+    for key, value in raw_counts.items():
+        try:
+            class_id = int(key)
+            count = int(value)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0:
+            continue
+        parsed.append((class_id, count))
+
+    if not parsed:
+        return []
+
+    parsed.sort(key=lambda item: (item[1], item[0]))
+    tail_size = max(1, min(max_tail_classes, int(math.ceil(len(parsed) * max(0.05, quantile)))))
+    return [class_id for class_id, _ in parsed[:tail_size]]
+
+
 def _compute_flags(features: dict[str, float], cfg: RuleEngineConfig) -> dict[str, bool]:
     """Convert numeric features to categorical flags used by interpretable rules."""
     return {
@@ -132,6 +165,7 @@ def generate_policy_from_stats(
 
     features = _extract_train_features(stats)
     flags = _compute_flags(features, cfg)
+    tail_class_ids_small = _compute_tail_class_ids_small(stats)
     changes: list[dict[str, Any]] = []
 
     ultralytics_args = {
@@ -239,6 +273,7 @@ def generate_policy_from_stats(
                 "ioa_threshold": cfg.bbox_copy_paste_ioa_threshold,
                 "max_pastes": cfg.bbox_copy_paste_max_pastes,
                 "prefer_small": flags["is_small_imbalanced"],
+                "tail_class_ids": tail_class_ids_small if flags["is_small_imbalanced"] else [],
             },
         },
     ]
@@ -251,6 +286,7 @@ def generate_policy_from_stats(
         "metadata": {
             "features": features,
             "flags": flags,
+            "tail_class_ids_small": tail_class_ids_small,
             "schema_version": "1.0.0",
         },
     }

@@ -142,6 +142,51 @@ def save_validation_report(report: dict, output_path: str | Path) -> None:
     dump_json(report, output_path)
 
 
+def _split_counts_from_validation(report: dict, split: str = "train") -> int:
+    split_payload = report.get("splits", {}).get(split, {})
+    return int(split_payload.get("num_images", 0))
+
+
+def prepare_dataset_by_mode(
+    dataset_root: str | Path,
+    mode: str = "manual",
+    raw_visdrone_root: str | Path | None = None,
+    splits: tuple[str, ...] = ("train", "val"),
+    image_extensions: tuple[str, ...] = DEFAULT_IMAGE_SUFFIXES,
+) -> dict:
+    """
+    Prepare or validate VisDrone YOLO dataset according to MVP mode contract.
+
+    Modes:
+    - manual: validate existing prepared dataset only.
+    - auto: convert raw VisDrone into YOLO layout, then validate.
+    """
+    mode_norm = str(mode).strip().lower()
+    dataset_root = Path(dataset_root)
+
+    if mode_norm not in {"manual", "auto"}:
+        raise ValueError(f"Unsupported dataset mode: '{mode}'. Expected 'manual' or 'auto'.")
+
+    if mode_norm == "auto":
+        if raw_visdrone_root is None:
+            raise ValueError("raw_visdrone_root must be provided when dataset.mode='auto'.")
+        prepare_visdrone_auto(raw_visdrone_root=raw_visdrone_root, output_root=dataset_root)
+
+    report = validate_visdrone_yolo_structure(
+        dataset_root=dataset_root,
+        splits=splits,
+        image_extensions=image_extensions,
+    )
+    train_images = _split_counts_from_validation(report, split="train")
+    val_images = _split_counts_from_validation(report, split="val")
+    report["summary"] = {
+        "mode": mode_norm,
+        "train_images": train_images,
+        "val_images": val_images,
+    }
+    return report
+
+
 def _resolve_visdrone_split_dir(raw_root: Path, split: str) -> Path | None:
     """
     Resolve source directory for a split in raw VisDrone layout.

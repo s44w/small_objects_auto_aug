@@ -142,12 +142,15 @@ class BBoxCopyPasteTransform:
     max_pastes: int = 3
     max_trials: int = 20
     prefer_small: bool = False
+    preferred_classes: set[int] | None = None
     small_max_area: float = 32.0**2
     seed: int = 42
     object_bank: ObjectBank | None = None
 
     def __post_init__(self) -> None:
         self._rng = random.Random(self.seed)
+        if self.preferred_classes is not None:
+            self.preferred_classes = {int(class_id) for class_id in self.preferred_classes}
 
     def _sample_donor_from_sample(
         self,
@@ -159,10 +162,15 @@ class BBoxCopyPasteTransform:
             return None
 
         indices = list(range(len(bboxes)))
+        if self.preferred_classes:
+            class_filtered = [idx for idx, class_id in enumerate(class_labels) if class_id in self.preferred_classes]
+            if class_filtered:
+                indices = class_filtered
+
         if self.prefer_small:
             small_indices = [idx for idx, box in enumerate(bboxes) if _bbox_area(box) <= self.small_max_area]
             if small_indices:
-                indices = small_indices
+                indices = [idx for idx in small_indices if idx in indices] or small_indices
 
         donor_idx = self._rng.choice(indices)
         x1, y1, x2, y2 = [int(round(v)) for v in bboxes[donor_idx]]
@@ -187,7 +195,10 @@ class BBoxCopyPasteTransform:
     ) -> tuple[np.ndarray, int] | None:
         # Prefer object bank when available and non-empty.
         if self.object_bank is not None and self.object_bank.size > 0:
-            entry = self.object_bank.sample_entry(prefer_small=self.prefer_small)
+            entry = self.object_bank.sample_entry(
+                preferred_classes=self.preferred_classes,
+                prefer_small=self.prefer_small,
+            )
             if entry is not None:
                 patch = self.object_bank.extract_patch(entry)
                 if patch is not None:
@@ -310,6 +321,7 @@ def build_custom_transforms(
                     iou_threshold=float(params.get("iou_threshold", 0.3)),
                     max_pastes=int(params.get("max_pastes", 3)),
                     prefer_small=bool(params.get("prefer_small", False)),
+                    preferred_classes=set(params.get("tail_class_ids", [])) or None,
                     seed=seed + index,
                     object_bank=object_bank,
                 )
@@ -339,4 +351,3 @@ def apply_custom_transforms(
         out = transform(out)
         out = sanitize_bboxes(out, min_area=min_area)
     return out
-
