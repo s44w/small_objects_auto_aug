@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import inspect
 from dataclasses import dataclass
 from typing import Any
 
@@ -89,15 +90,17 @@ class BBoxAwareCropTransform:
         if A is None:
             raise ImportError("albumentations is required for BBoxAwareCropTransform")
         self._rng = random.Random(self.seed)
+        bbox_params_kwargs = {
+            "format": "pascal_voc",
+            "label_fields": ["class_labels"],
+            "min_visibility": self.min_visibility,
+            "min_area": self.min_area,
+        }
+        if "clip" in inspect.signature(A.BboxParams).parameters:
+            bbox_params_kwargs["clip"] = True
         self._crop = A.Compose(
             [A.RandomSizedBBoxSafeCrop(height=self.height, width=self.width, p=1.0)],
-            bbox_params=A.BboxParams(
-                format="pascal_voc",
-                label_fields=["class_labels"],
-                min_visibility=self.min_visibility,
-                min_area=self.min_area,
-                clip=True,
-            ),
+            bbox_params=A.BboxParams(**bbox_params_kwargs),
         )
 
     def __call__(self, sample: dict[str, Any]) -> dict[str, Any]:
@@ -116,11 +119,14 @@ class BBoxAwareCropTransform:
         if len(transformed["bboxes"]) == 0:
             return sample
 
-        return {
+        return sanitize_bboxes(
+            {
             "image": transformed["image"],
             "bboxes": [list(map(float, bbox)) for bbox in transformed["bboxes"]],
             "class_labels": [int(cls_id) for cls_id in transformed["class_labels"]],
-        }
+            },
+            min_area=self.min_area,
+        )
 
 
 @dataclass

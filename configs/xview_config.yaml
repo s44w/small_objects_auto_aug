@@ -1,0 +1,136 @@
+project:
+  name: "xview_auto_aug_mvp"
+  seed: 42
+  deterministic: true
+
+dataset:
+  kind: "yolo_generic"   # visdrone | coco_small | yolo_generic
+  root: "./datasets/xview_yolo"
+  mode: "manual"
+  splits:
+    - "train"
+    - "val"
+  image_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+  # If your prepared xView YAML already contains names, you can remove class_names
+  # and keep only training.data_yaml reference.
+  class_names:
+    - "fixed-wing-aircraft"
+    - "small-aircraft"
+    - "cargo-plane"
+    - "helicopter"
+    - "passenger-vehicle"
+    - "small-car"
+    - "bus"
+    - "pickup-truck"
+    - "utility-truck"
+    - "truck"
+    - "cargo-truck"
+    - "truck-w-trailer"
+    - "truck-tractor"
+    - "trailer"
+    - "truck-w-box"
+    - "truck-w-flatbed"
+    - "truck-w-liquid"
+    - "crane-truck"
+    - "railway-vehicle"
+    - "passenger-car"
+    - "cargo-car"
+    - "flat-car"
+    - "tank-car"
+    - "locomotive"
+    - "maritime-vessel"
+    - "motorboat"
+    - "sailboat"
+    - "tugboat"
+    - "barge"
+    - "fishing-vessel"
+    - "ferry"
+    - "yacht"
+    - "container-ship"
+    - "oil-tanker"
+    - "engineering-vehicle"
+    - "tower-crane"
+    - "container-crane"
+    - "reach-stacker"
+    - "straddle-carrier"
+    - "mobile-crane"
+    - "dump-truck"
+    - "haul-truck"
+    - "scraper-tractor"
+    - "front-loader"
+    - "excavator"
+    - "cement-mixer"
+    - "ground-grader"
+    - "hut-tent"
+    - "shed"
+    - "building"
+    - "damaged-building"
+    - "facility"
+    - "construction-site"
+    - "vehicle-lot"
+    - "helipad"
+    - "storage-tank"
+    - "shipping-container"
+    - "pylon"
+    - "tower"
+    - "satellite-dish"
+  tiling:
+    enabled: false
+    tile_size: 1024
+    overlap: 256
+    min_visibility: 0.30
+    include_empty: false
+
+analysis:
+  small_max_area: 1024.0
+  medium_max_area: 9216.0
+  tiny_max_area: 256.0
+  generate_plots: true
+
+policy:
+  use_object_bank: true
+  object_bank:
+    max_items_per_class: 2000
+  small_ratio_threshold: 0.5
+  dense_objects_per_image_threshold: 15.0
+  dense_objects_per_mpix_threshold: 30.0
+  illum_v_std_threshold: 35.0
+  imbalance_ratio_threshold: 10.0
+  small_imbalance_ratio_threshold: 6.0
+  allow_flipud: false
+  enable_mixup_cutmix: false
+  low_variability_vstd_threshold: 14.0
+  bbox_crop_min_visibility: 0.30
+  bbox_crop_min_area: 16.0
+  bbox_copy_paste_ioa_threshold: 0.30
+  bbox_copy_paste_max_pastes: 3
+
+training:
+  model: "yolo11n.pt"
+  data_yaml: "./datasets/xview_yolo/xview.yaml"
+  epochs_fast: 10
+  epochs_final: 80
+  fraction_final: 1.0
+  imgsz: 960
+  batch: 8
+  device: null
+  workers: 2
+  fraction_fast: 0.15
+  project_dir: "./runs"
+  run_ablation: true
+  baseline_disable_albumentations: true
+  require_custom_augmentations: true
+  # Uncomment for final statistical replication:
+  # seeds: [42, 43, 44]
+  rect: false
+  multi_scale: false
+
+evaluation:
+  iou_type: "bbox"
+  use_tiny_eval: true
+  use_tta: true
+  imgsz: 960

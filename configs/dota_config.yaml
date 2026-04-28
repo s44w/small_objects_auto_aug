@@ -1,13 +1,12 @@
 project:
-  name: "small_objects_auto_aug_mvp"
+  name: "dota_auto_aug_mvp"
   seed: 42
   deterministic: true
 
 dataset:
-  kind: "visdrone"  # visdrone | coco_small
-  root: "./datasets/visdrone_yolo"
-  mode: "manual"  # manual | auto
-  raw_root: "./datasets/visdrone_raw"  # required when mode=auto
+  kind: "yolo_generic"   # visdrone | coco_small | yolo_generic
+  root: "./datasets/dota_yolo"
+  mode: "manual"
   splits:
     - "train"
     - "val"
@@ -16,22 +15,33 @@ dataset:
     - ".jpeg"
     - ".png"
     - ".bmp"
-  visdrone_classes:
-    - "pedestrian"
-    - "people"
-    - "bicycle"
-    - "car"
-    - "van"
-    - "truck"
-    - "tricycle"
-    - "awning-tricycle"
-    - "bus"
-    - "motor"
+  class_names:
+    - "plane"
+    - "ship"
+    - "storage-tank"
+    - "baseball-diamond"
+    - "tennis-court"
+    - "basketball-court"
+    - "ground-track-field"
+    - "harbor"
+    - "bridge"
+    - "large-vehicle"
+    - "small-vehicle"
+    - "helicopter"
+    - "roundabout"
+    - "soccer-ball-field"
+    - "swimming-pool"
+  tiling:
+    enabled: false
+    tile_size: 1024
+    overlap: 256
+    min_visibility: 0.30
+    include_empty: false
 
 analysis:
-  small_max_area: 1024.0          # 32^2
-  medium_max_area: 9216.0         # 96^2
-  tiny_max_area: 256.0            # 16^2
+  small_max_area: 1024.0
+  medium_max_area: 9216.0
+  tiny_max_area: 256.0
   generate_plots: true
 
 policy:
@@ -53,16 +63,16 @@ policy:
   bbox_copy_paste_max_pastes: 3
 
 training:
-  model: "yolo26n.pt"
-  data_yaml: "./datasets/visdrone_yolo/visdrone.yaml"
-  epochs_fast: 20
-  epochs_final: 100
+  model: "yolo11n.pt"
+  data_yaml: "./datasets/dota_yolo/dota.yaml"
+  epochs_fast: 10
+  epochs_final: 80
   fraction_final: 1.0
-  imgsz: 640
-  batch: 16
+  imgsz: 960
+  batch: 8
   device: null
-  workers: 4
-  fraction_fast: 0.2
+  workers: 2
+  fraction_fast: 0.15
   project_dir: "./runs"
   run_ablation: true
   baseline_disable_albumentations: true

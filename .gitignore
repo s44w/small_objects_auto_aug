@@ -20,6 +20,7 @@ tmp_hotfix_check/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
+notebooks/datasets_local/
 
 # OS/editor
 .DS_Store

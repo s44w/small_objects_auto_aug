@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import shutil
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -293,6 +294,85 @@ def _convert_annotation_row_to_yolo(
         return None
 
     return f"{class_id} {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n"
+
+
+def build_visdrone_scene_difficulty_report(
+    raw_visdrone_root: str | Path,
+    output_path: str | Path = "artifacts/stats/visdrone_scene_difficulty.json",
+) -> dict:
+    """
+    Summarize VisDrone truncation/occlusion attributes from raw DET annotations.
+
+    The prepared YOLO labels intentionally contain only class + bbox, so this
+    report preserves the richer VisDrone metadata for analysis and future rules.
+    """
+    raw_root = Path(raw_visdrone_root)
+    report: dict = {
+        "raw_root": raw_root.as_posix(),
+        "splits": {},
+        "notes": {
+            "truncation": "VisDrone DET row field 7, kept as integer buckets.",
+            "occlusion": "VisDrone DET row field 8, kept as integer buckets.",
+        },
+    }
+
+    for split in ("train", "val", "test"):
+        source_dir = _resolve_visdrone_split_dir(raw_root, split=split)
+        if source_dir is None:
+            continue
+        ann_dir = source_dir / "annotations"
+        if not ann_dir.exists():
+            annotation_dirs = [path for path in source_dir.rglob("annotations") if path.is_dir()]
+            if annotation_dirs:
+                ann_dir = max(annotation_dirs, key=lambda path: len(list(path.glob("*.txt"))))
+        if not ann_dir.exists():
+            continue
+
+        truncation_counts: Counter[int] = Counter()
+        occlusion_counts: Counter[int] = Counter()
+        class_occlusion_counts: dict[int, Counter[int]] = {}
+        num_objects = 0
+        num_ignored = 0
+
+        for ann_path in sorted(ann_dir.glob("*.txt")):
+            with ann_path.open("r", encoding="utf-8") as file:
+                for raw_line in file.read().splitlines():
+                    if not raw_line.strip():
+                        continue
+                    row = [item.strip() for item in raw_line.split(",")]
+                    if len(row) < 8:
+                        continue
+                    if row[4] == "0":
+                        num_ignored += 1
+                        continue
+                    try:
+                        class_id = int(float(row[5])) - 1
+                        truncation = int(float(row[6]))
+                        occlusion = int(float(row[7]))
+                    except ValueError:
+                        continue
+                    if class_id < 0 or class_id > 9:
+                        continue
+                    num_objects += 1
+                    truncation_counts[truncation] += 1
+                    occlusion_counts[occlusion] += 1
+                    class_occlusion_counts.setdefault(class_id, Counter())[occlusion] += 1
+
+        report["splits"][split] = {
+            "num_objects": num_objects,
+            "num_ignored_regions": num_ignored,
+            "truncation_counts": {str(k): int(v) for k, v in sorted(truncation_counts.items())},
+            "occlusion_counts": {str(k): int(v) for k, v in sorted(occlusion_counts.items())},
+            "occluded_ratio": float(sum(v for k, v in occlusion_counts.items() if k > 0)) / max(1, num_objects),
+            "truncated_ratio": float(sum(v for k, v in truncation_counts.items() if k > 0)) / max(1, num_objects),
+            "class_occlusion_counts": {
+                str(class_id): {str(k): int(v) for k, v in sorted(counter.items())}
+                for class_id, counter in sorted(class_occlusion_counts.items())
+            },
+        }
+
+    dump_json(report, output_path)
+    return report
 
 
 def _convert_visdrone_split_to_yolo(

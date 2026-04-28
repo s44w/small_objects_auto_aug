@@ -23,6 +23,10 @@ augmentation selection pipeline for small-object detection, following
   - `adaptive_no_mosaic`,
   - `adaptive_no_custom_albu`.
 - YOLO -> COCO conversion and COCOeval runner with `AP_small` and optional `AP_tiny`.
+- Object-bank based bbox copy-paste support for adaptive training.
+- Experiment manifest with timings, artifact paths, and multi-run COCOeval reports.
+- Optional multi-seed training suite (`training.seeds`) for mean/std replication.
+- Budget-aware AutoAug-like random-search candidate generator for comparison studies.
 - Colab notebook for the main MVP pipeline.
 
 ## Repository layout
@@ -69,9 +73,20 @@ Notes:
   - `dataset.mode=manual`: validate existing YOLO dataset.
   - `dataset.mode=auto`: convert from `dataset.raw_root` then validate.
 - Evaluation can auto-generate predictions from the best available run
-  (`results.csv` metric `metrics/mAP50-95(B)`) when `--pred-labels-dir` is omitted.
+  and now evaluates all available MVP runs (`baseline`, `manual`, `adaptive`,
+  `adaptive_no_mosaic`, `adaptive_no_custom_albu`) when `--pred-labels-dir` is omitted.
 - Training profile can be selected via `--train-profile` (`fast`, `final`, `balanced`,
   `quality`, `hour`, `max_quality`).
+- Set `training.seeds: [42, 43, 44]` for multi-seed replication.
+- Set `policy.use_object_bank: true` to build `artifacts/policy/object_bank.json`
+  and use it in adaptive bbox copy-paste.
+
+## Documentation
+
+- `docs/DATASET_ANALYTICS.md` describes dataset statistics, outputs, and recommended extensions.
+- `docs/AUGMENTATION_POLICY.md` describes rule-based policy generation and custom augmentations.
+- `docs/THRESHOLDS.md` documents threshold values, interpretation, and calibration.
+- `docs/REFERENCES.md` lists the primary sources used by the MVP.
 
 ## Main Colab workflow
 
@@ -79,6 +94,9 @@ Use notebook:
 
 - `notebooks/mvp_pipeline_colab.ipynb`
 - `notebooks/coco_small_pipeline_colab.ipynb` (COCO-small pipeline)
+- `notebooks/autoaug_vs_adaptive_comparison.ipynb` (AutoAug-like search vs this project)
+- `notebooks/visdrone_tiny_fixture_smoke.ipynb` (self-contained VisDrone-like module smoke test, <1 min)
+- `notebooks/visdrone_real_subset_smoke.ipynb` (fast smoke test on a real prepared VisDrone YOLO subset)
 
 It runs:
 1. dataset validation,

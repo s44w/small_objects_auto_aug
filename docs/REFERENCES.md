@@ -2,6 +2,14 @@
 
 The implementation follows `instructions.md` and the official documentation below:
 
+Project documentation:
+
+- Dataset analytics: `docs/DATASET_ANALYTICS.md`
+- Augmentation policy: `docs/AUGMENTATION_POLICY.md`
+- Thresholds and calibration: `docs/THRESHOLDS.md`
+
+Primary sources:
+
 - Ultralytics augmentations and train arguments:
   - https://docs.ultralytics.com/modes/train/
   - https://docs.ultralytics.com/guides/yolo-data-augmentation/

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass, fields, is_dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from src.augmentation.object_bank import ObjectBank
 from src.augmentation.policy_to_ultralytics import AugmentationPolicy
 from src.policy.policy_schema import filter_ultralytics_detect_args
 from src.utils.io import dump_yaml, load_json, load_yaml
@@ -33,6 +34,7 @@ class TrainRunConfig:
     rect: bool = False
     multi_scale: bool = False
     baseline_disable_albumentations: bool = True
+    require_custom_augmentations: bool = True
     plots: bool = False
 
 
@@ -132,6 +134,13 @@ def run_train_mode(
         # Some Ultralytics versions may reject "augmentations".
         if "augmentations" not in str(exc):
             raise
+        if custom_augmentations is not None and config.require_custom_augmentations:
+            raise RuntimeError(
+                "Ultralytics rejected the Python API 'augmentations' argument. "
+                "Adaptive custom augmentations would be silently disabled, so the run was stopped. "
+                "Install/use an Ultralytics build that supports custom augmentations or set "
+                "require_custom_augmentations=false for an explicit fallback experiment."
+            ) from exc
         LOGGER.warning(
             "Current Ultralytics build does not accept 'augmentations'. "
             "Retrying mode '%s' without custom transforms.",
@@ -160,6 +169,7 @@ def run_mvp_training_suite(
     manual_yaml_path: str | Path,
     adaptive_policy_json_path: str | Path,
     run_ablation: bool = True,
+    object_bank_path: str | Path | None = None,
 ) -> dict[str, str]:
     """
     Run baseline, manual, adaptive and two ablations:
@@ -170,6 +180,7 @@ def run_mvp_training_suite(
     manual_args = load_yaml(manual_yaml_path)
     adaptive_payload = load_json(adaptive_policy_json_path)
     adaptive_policy = AugmentationPolicy(payload=adaptive_payload)
+    object_bank = ObjectBank.load(object_bank_path, seed=config.seed) if object_bank_path else None
 
     run_dirs: dict[str, str] = {}
     run_dirs["baseline"] = run_train_mode(
@@ -190,7 +201,10 @@ def run_mvp_training_suite(
         mode="adaptive",
         config=config,
         mode_args=adaptive_policy.get_ultralytics_train_args(),
-        custom_augmentations=adaptive_policy.get_albumentations_transforms(seed=config.seed),
+        custom_augmentations=adaptive_policy.get_albumentations_transforms(
+            object_bank=object_bank,
+            seed=config.seed,
+        ),
     ).as_posix()
 
     if run_ablation:
@@ -200,7 +214,10 @@ def run_mvp_training_suite(
             mode="adaptive_no_mosaic",
             config=config,
             mode_args=adaptive_args_no_mosaic,
-            custom_augmentations=adaptive_policy.get_albumentations_transforms(seed=config.seed + 1),
+            custom_augmentations=adaptive_policy.get_albumentations_transforms(
+                object_bank=object_bank,
+                seed=config.seed + 1,
+            ),
         ).as_posix()
 
         run_dirs["adaptive_no_custom_albu"] = run_train_mode(
@@ -211,6 +228,40 @@ def run_mvp_training_suite(
         ).as_posix()
 
     return run_dirs
+
+
+def run_mvp_training_suite_multiseed(
+    config: TrainRunConfig,
+    seeds: list[int],
+    baseline_yaml_path: str | Path,
+    manual_yaml_path: str | Path,
+    adaptive_policy_json_path: str | Path,
+    run_ablation: bool = True,
+    object_bank_path: str | Path | None = None,
+) -> dict[str, dict[str, str]]:
+    """
+    Run the full training suite for several seeds.
+
+    Each seed is written under project_dir/seed_<seed>/ so Ultralytics run names
+    stay readable while results remain separated.
+    """
+    outputs: dict[str, dict[str, str]] = {}
+    base_project_dir = Path(config.project_dir)
+    for seed in seeds:
+        seed_config = replace(
+            config,
+            seed=int(seed),
+            project_dir=(base_project_dir / f"seed_{int(seed)}").as_posix(),
+        )
+        outputs[str(seed)] = run_mvp_training_suite(
+            config=seed_config,
+            baseline_yaml_path=baseline_yaml_path,
+            manual_yaml_path=manual_yaml_path,
+            adaptive_policy_json_path=adaptive_policy_json_path,
+            run_ablation=run_ablation,
+            object_bank_path=object_bank_path,
+        )
+    return outputs
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -230,6 +281,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manual-yaml", type=str, default="configs/manual.yaml")
     parser.add_argument("--adaptive-policy-json", type=str, default="artifacts/policy/policy_adaptive.json")
     parser.add_argument("--no-ablation", action="store_true")
+    parser.add_argument("--object-bank", type=str, default=None)
+    parser.add_argument("--allow-custom-augmentation-fallback", action="store_true")
     return parser
 
 
@@ -247,6 +300,7 @@ def main() -> None:
         project_dir=args.project_dir,
         seed=args.seed,
         deterministic=bool(args.deterministic),
+        require_custom_augmentations=not args.allow_custom_augmentation_fallback,
     )
     LOGGER.info("Train config: %s", asdict(config))
     run_dirs = run_mvp_training_suite(
@@ -255,6 +309,7 @@ def main() -> None:
         manual_yaml_path=args.manual_yaml,
         adaptive_policy_json_path=args.adaptive_policy_json,
         run_ablation=not args.no_ablation,
+        object_bank_path=args.object_bank,
     )
     LOGGER.info("Completed training modes: %s", run_dirs)
 

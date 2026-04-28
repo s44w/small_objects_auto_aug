@@ -111,6 +111,9 @@ analysis:
   generate_plots: true
 
 policy:
+  use_object_bank: true
+  object_bank:
+    max_items_per_class: 2000
   small_ratio_threshold: 0.5
   dense_objects_per_image_threshold: 15.0
   dense_objects_per_mpix_threshold: 30.0
@@ -139,6 +142,9 @@ training:
   project_dir: "./runs"
   run_ablation: true
   baseline_disable_albumentations: true
+  require_custom_augmentations: true
+  # Uncomment for final statistical replication:
+  # seeds: [42, 43, 44]
   rect: false
   multi_scale: false
 
