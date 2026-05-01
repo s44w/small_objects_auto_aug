@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,33 @@ from src.utils.logging import configure_logging, get_logger
 
 
 LOGGER = get_logger(__name__)
+
+
+def _resolve_project_root(project_config_path: str | Path) -> tuple[Path, Path]:
+    """
+    Resolve absolute config path and infer repository root.
+
+    The root is detected as the nearest parent containing both `src/` and `configs/`.
+    This makes pipeline execution independent from current working directory.
+    """
+    config_path = Path(project_config_path).expanduser()
+    if not config_path.is_absolute():
+        config_path = (Path.cwd() / config_path).resolve()
+    else:
+        config_path = config_path.resolve()
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Project config not found: {config_path.as_posix()}")
+
+    for candidate in [config_path.parent, *config_path.parents]:
+        if (candidate / "src").exists() and (candidate / "configs").exists():
+            return config_path, candidate
+
+    raise FileNotFoundError(
+        "Could not infer project root from project_config_path. "
+        "Expected a parent directory containing both 'src/' and 'configs/'. "
+        f"Config path: {config_path.as_posix()}"
+    )
 
 
 def _dataset_class_names(cfg: dict, dataset_root: Path) -> list[str]:
@@ -316,279 +344,292 @@ def run_mvp_pipeline(
       5) (Optional) run COCO conversion + evaluation
     """
     timings: dict[str, float] = {}
-    cfg = load_yaml(project_config_path)
+    resolved_config_path, project_root = _resolve_project_root(project_config_path)
+    cwd_before = Path.cwd().resolve()
+    if cwd_before != project_root:
+        LOGGER.info(
+            "Switching working directory for pipeline execution: %s -> %s",
+            cwd_before.as_posix(),
+            project_root.as_posix(),
+        )
 
-    dataset_cfg = cfg["dataset"]
-    dataset_root = Path(dataset_cfg["root"])
-    dataset_kind = str(dataset_cfg.get("kind", "visdrone")).strip().lower()
-    dataset_mode = str(dataset_cfg.get("mode", "manual"))
-    raw_root = dataset_cfg.get("raw_root")
-    splits = tuple(dataset_cfg.get("splits", ["train", "val"]))
-    image_ext = tuple(dataset_cfg.get("image_extensions", [".jpg", ".jpeg", ".png", ".bmp"]))
+    os.chdir(project_root)
+    try:
+        cfg = load_yaml(resolved_config_path)
 
-    stage_start = time.perf_counter()
-    tiling_reports = _maybe_tile_yolo_dataset(
-        dataset_cfg=dataset_cfg,
-        dataset_root=dataset_root,
-        raw_root=raw_root,
-        splits=splits,
-        image_extensions=image_ext,
-    )
-    if tiling_reports:
-        timings["tiling"] = time.perf_counter() - stage_start
-        dump_json(tiling_reports, "artifacts/stats/tiling_reports.json")
+        dataset_cfg = cfg["dataset"]
+        dataset_root = Path(dataset_cfg["root"])
+        dataset_kind = str(dataset_cfg.get("kind", "visdrone")).strip().lower()
+        dataset_mode = str(dataset_cfg.get("mode", "manual"))
+        raw_root = dataset_cfg.get("raw_root")
+        splits = tuple(dataset_cfg.get("splits", ["train", "val"]))
+        image_ext = tuple(dataset_cfg.get("image_extensions", [".jpg", ".jpeg", ".png", ".bmp"]))
+
         stage_start = time.perf_counter()
+        tiling_reports = _maybe_tile_yolo_dataset(
+            dataset_cfg=dataset_cfg,
+            dataset_root=dataset_root,
+            raw_root=raw_root,
+            splits=splits,
+            image_extensions=image_ext,
+        )
+        if tiling_reports:
+            timings["tiling"] = time.perf_counter() - stage_start
+            dump_json(tiling_reports, "artifacts/stats/tiling_reports.json")
+            stage_start = time.perf_counter()
 
-    if dataset_kind == "visdrone":
-        validation_report = prepare_dataset_by_mode(
-            dataset_root=dataset_root,
-            mode=dataset_mode,
-            raw_visdrone_root=raw_root,
-            splits=splits,
-            image_extensions=image_ext,
-        )
-    elif dataset_kind == "coco_small":
-        coco_cfg_payload = dataset_cfg.get("coco_small", {})
-        coco_prepare_cfg = CocoSmallPrepareConfig(
-            small_max_area=float(coco_cfg_payload.get("small_max_area", cfg["analysis"]["small_max_area"])),
-            keep_images_without_small=bool(coco_cfg_payload.get("keep_images_without_small", False)),
-            include_crowd=bool(coco_cfg_payload.get("include_crowd", False)),
-            splits=splits,
-            link_images=bool(coco_cfg_payload.get("link_images", True)),
-            image_extensions=image_ext,
-            selected_category_ids=coco_cfg_payload.get("selected_category_ids"),
-        )
-        validation_report = prepare_coco_small_by_mode(
-            dataset_root=dataset_root,
-            mode=dataset_mode,
-            raw_coco_root=raw_root,
-            config=coco_prepare_cfg,
-        )
-    elif dataset_kind == "yolo_generic":
-        if dataset_mode != "manual":
-            raise ValueError(
-                "dataset.kind='yolo_generic' currently supports only mode='manual'. "
-                "Provide prepared YOLO dataset in dataset.root."
+        if dataset_kind == "visdrone":
+            validation_report = prepare_dataset_by_mode(
+                dataset_root=dataset_root,
+                mode=dataset_mode,
+                raw_visdrone_root=raw_root,
+                splits=splits,
+                image_extensions=image_ext,
             )
-        validation_report = validate_visdrone_yolo_structure(
-            dataset_root=dataset_root,
-            splits=splits,
-            image_extensions=image_ext,
-        )
-        validation_report["summary"] = {
-            "mode": "manual",
-            "kind": "yolo_generic",
-        }
-    else:
-        raise ValueError(
-            f"Unsupported dataset.kind='{dataset_kind}'. "
-            "Expected one of: visdrone, coco_small, yolo_generic."
-        )
-
-    save_validation_report(validation_report, "artifacts/stats/validation_report.json")
-    LOGGER.info("Dataset validation completed. is_valid=%s", validation_report["is_valid"])
-    timings["dataset_validation"] = time.perf_counter() - stage_start
-
-    stage_start = time.perf_counter()
-    analysis_cfg = DatasetAnalyzerConfig(
-        small_max_area=float(cfg["analysis"]["small_max_area"]),
-        medium_max_area=float(cfg["analysis"]["medium_max_area"]),
-        tiny_max_area=float(cfg["analysis"]["tiny_max_area"]),
-        image_extensions=image_ext,
-        generate_plots=bool(cfg["analysis"].get("generate_plots", True)),
-    )
-    stats = analyze_dataset(
-        dataset_root=dataset_root,
-        output_dir="artifacts/stats",
-        splits=splits,
-        config=analysis_cfg,
-    )
-    timings["dataset_analysis"] = time.perf_counter() - stage_start
-
-    stage_start = time.perf_counter()
-    rule_cfg = RuleEngineConfig.from_project_config(cfg)
-    policy, decision_report = generate_policy_from_stats(stats, cfg=rule_cfg)
-    policy_paths = save_policy_artifacts(
-        policy=policy,
-        decision_report=decision_report,
-        output_dir="artifacts/policy",
-    )
-    LOGGER.info("Adaptive policy generated: %s", policy_paths)
-    timings["policy_generation"] = time.perf_counter() - stage_start
-
-    outputs: dict[str, Any] = {
-        "validation_report": "artifacts/stats/validation_report.json",
-        "dataset_stats_json": "artifacts/stats/dataset_stats.json",
-        "dataset_stats_csv": "artifacts/stats/dataset_stats.csv",
-        "policy_json": policy_paths["policy_json"].as_posix(),
-        "policy_yaml": policy_paths["policy_yaml"].as_posix(),
-        "decision_report": policy_paths["decision_report"].as_posix(),
-    }
-    if tiling_reports:
-        outputs["tiling_reports"] = "artifacts/stats/tiling_reports.json"
-    artifact_paths: dict[str, str] = {
-        "validation_report": outputs["validation_report"],
-        "dataset_stats_json": outputs["dataset_stats_json"],
-        "dataset_stats_csv": outputs["dataset_stats_csv"],
-        "policy_json": outputs["policy_json"],
-        "policy_yaml": outputs["policy_yaml"],
-        "decision_report": outputs["decision_report"],
-    }
-    if tiling_reports:
-        artifact_paths["tiling_reports"] = outputs["tiling_reports"]
-
-    if dataset_kind == "visdrone" and raw_root and Path(str(raw_root)).exists():
-        scene_report_path = Path("artifacts/stats/visdrone_scene_difficulty.json")
-        build_visdrone_scene_difficulty_report(
-            raw_visdrone_root=raw_root,
-            output_path=scene_report_path,
-        )
-        outputs["scene_difficulty_report"] = scene_report_path.as_posix()
-        artifact_paths["scene_difficulty_report"] = scene_report_path.as_posix()
-
-    object_bank_path: Path | None = None
-    if bool(cfg.get("policy", {}).get("use_object_bank", True)):
-        stage_start = time.perf_counter()
-        object_bank_path = _build_object_bank_artifact(
-            dataset_root=dataset_root,
-            cfg=cfg,
-            image_extensions=image_ext,
-        )
-        timings["object_bank_build"] = time.perf_counter() - stage_start
-        outputs["object_bank"] = object_bank_path.as_posix()
-        artifact_paths["object_bank"] = object_bank_path.as_posix()
-
-    if run_training:
-        stage_start = time.perf_counter()
-        training_cfg = cfg["training"]
-        train_profile_cfg = _resolve_training_profile(training_cfg, profile=train_profile)
-        class_names = _dataset_class_names(cfg=cfg, dataset_root=dataset_root)
-        runtime_data_yaml = _write_runtime_data_yaml(
-            dataset_root=dataset_root,
-            class_names=class_names,
-        )
-        train_cfg = TrainRunConfig(
-            data_yaml=runtime_data_yaml.as_posix(),
-            model=str(training_cfg["model"]),
-            epochs=int(train_profile_cfg["epochs"]),
-            imgsz=int(train_profile_cfg["imgsz"]),
-            batch=int(train_profile_cfg["batch"]),
-            device=training_cfg.get("device"),
-            workers=int(train_profile_cfg["workers"]),
-            fraction=float(train_profile_cfg["fraction"]),
-            project_dir=str(training_cfg["project_dir"]),
-            seed=int(cfg["project"]["seed"]),
-            deterministic=bool(cfg["project"]["deterministic"]),
-            rect=bool(training_cfg.get("rect", False)),
-            multi_scale=bool(train_profile_cfg["multi_scale"]),
-            baseline_disable_albumentations=bool(
-                training_cfg.get("baseline_disable_albumentations", True)
-            ),
-            require_custom_augmentations=bool(
-                training_cfg.get("require_custom_augmentations", True)
-            ),
-        )
-        seeds = [int(seed) for seed in training_cfg.get("seeds", [])]
-        if seeds:
-            run_dirs_by_seed = run_mvp_training_suite_multiseed(
-                config=train_cfg,
-                seeds=seeds,
-                baseline_yaml_path="configs/baseline.yaml",
-                manual_yaml_path="configs/manual.yaml",
-                adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
-                run_ablation=bool(training_cfg.get("run_ablation", True)),
-                object_bank_path=object_bank_path,
+        elif dataset_kind == "coco_small":
+            coco_cfg_payload = dataset_cfg.get("coco_small", {})
+            coco_prepare_cfg = CocoSmallPrepareConfig(
+                small_max_area=float(coco_cfg_payload.get("small_max_area", cfg["analysis"]["small_max_area"])),
+                keep_images_without_small=bool(coco_cfg_payload.get("keep_images_without_small", False)),
+                include_crowd=bool(coco_cfg_payload.get("include_crowd", False)),
+                splits=splits,
+                link_images=bool(coco_cfg_payload.get("link_images", True)),
+                image_extensions=image_ext,
+                selected_category_ids=coco_cfg_payload.get("selected_category_ids"),
             )
-            outputs["train_runs_by_seed"] = run_dirs_by_seed
+            validation_report = prepare_coco_small_by_mode(
+                dataset_root=dataset_root,
+                mode=dataset_mode,
+                raw_coco_root=raw_root,
+                config=coco_prepare_cfg,
+            )
+        elif dataset_kind == "yolo_generic":
+            if dataset_mode != "manual":
+                raise ValueError(
+                    "dataset.kind='yolo_generic' currently supports only mode='manual'. "
+                    "Provide prepared YOLO dataset in dataset.root."
+                )
+            validation_report = validate_visdrone_yolo_structure(
+                dataset_root=dataset_root,
+                splits=splits,
+                image_extensions=image_ext,
+            )
+            validation_report["summary"] = {
+                "mode": "manual",
+                "kind": "yolo_generic",
+            }
         else:
-            run_dirs = run_mvp_training_suite(
-                config=train_cfg,
-                baseline_yaml_path="configs/baseline.yaml",
-                manual_yaml_path="configs/manual.yaml",
-                adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
-                run_ablation=bool(training_cfg.get("run_ablation", True)),
-                object_bank_path=object_bank_path,
+            raise ValueError(
+                f"Unsupported dataset.kind='{dataset_kind}'. "
+                "Expected one of: visdrone, coco_small, yolo_generic."
             )
-            outputs["train_runs"] = run_dirs
-        outputs["runtime_data_yaml"] = runtime_data_yaml.as_posix()
-        outputs["train_profile"] = train_profile
-        artifact_paths["runtime_data_yaml"] = runtime_data_yaml.as_posix()
-        timings["training_suite"] = time.perf_counter() - stage_start
 
-    if run_eval:
+        save_validation_report(validation_report, "artifacts/stats/validation_report.json")
+        LOGGER.info("Dataset validation completed. is_valid=%s", validation_report["is_valid"])
+        timings["dataset_validation"] = time.perf_counter() - stage_start
+
         stage_start = time.perf_counter()
-        class_names = _dataset_class_names(cfg=cfg, dataset_root=dataset_root)
-        if pred_labels_dir is not None:
-            report_run_name = str(eval_run_name or "external_predictions")
-            metrics_by_run = {
-                report_run_name: _evaluate_prediction_dir(
-                    run_name=report_run_name,
-                    pred_labels_dir=pred_labels_dir,
+        analysis_cfg = DatasetAnalyzerConfig(
+            small_max_area=float(cfg["analysis"]["small_max_area"]),
+            medium_max_area=float(cfg["analysis"]["medium_max_area"]),
+            tiny_max_area=float(cfg["analysis"]["tiny_max_area"]),
+            image_extensions=image_ext,
+            generate_plots=bool(cfg["analysis"].get("generate_plots", True)),
+        )
+        stats = analyze_dataset(
+            dataset_root=dataset_root,
+            output_dir="artifacts/stats",
+            splits=splits,
+            config=analysis_cfg,
+        )
+        timings["dataset_analysis"] = time.perf_counter() - stage_start
+
+        stage_start = time.perf_counter()
+        rule_cfg = RuleEngineConfig.from_project_config(cfg)
+        policy, decision_report = generate_policy_from_stats(stats, cfg=rule_cfg)
+        policy_paths = save_policy_artifacts(
+            policy=policy,
+            decision_report=decision_report,
+            output_dir="artifacts/policy",
+        )
+        LOGGER.info("Adaptive policy generated: %s", policy_paths)
+        timings["policy_generation"] = time.perf_counter() - stage_start
+
+        outputs: dict[str, Any] = {
+            "validation_report": "artifacts/stats/validation_report.json",
+            "dataset_stats_json": "artifacts/stats/dataset_stats.json",
+            "dataset_stats_csv": "artifacts/stats/dataset_stats.csv",
+            "policy_json": policy_paths["policy_json"].as_posix(),
+            "policy_yaml": policy_paths["policy_yaml"].as_posix(),
+            "decision_report": policy_paths["decision_report"].as_posix(),
+        }
+        if tiling_reports:
+            outputs["tiling_reports"] = "artifacts/stats/tiling_reports.json"
+        artifact_paths: dict[str, str] = {
+            "validation_report": outputs["validation_report"],
+            "dataset_stats_json": outputs["dataset_stats_json"],
+            "dataset_stats_csv": outputs["dataset_stats_csv"],
+            "policy_json": outputs["policy_json"],
+            "policy_yaml": outputs["policy_yaml"],
+            "decision_report": outputs["decision_report"],
+        }
+        if tiling_reports:
+            artifact_paths["tiling_reports"] = outputs["tiling_reports"]
+
+        if dataset_kind == "visdrone" and raw_root and Path(str(raw_root)).exists():
+            scene_report_path = Path("artifacts/stats/visdrone_scene_difficulty.json")
+            build_visdrone_scene_difficulty_report(
+                raw_visdrone_root=raw_root,
+                output_path=scene_report_path,
+            )
+            outputs["scene_difficulty_report"] = scene_report_path.as_posix()
+            artifact_paths["scene_difficulty_report"] = scene_report_path.as_posix()
+
+        object_bank_path: Path | None = None
+        if bool(cfg.get("policy", {}).get("use_object_bank", True)):
+            stage_start = time.perf_counter()
+            object_bank_path = _build_object_bank_artifact(
+                dataset_root=dataset_root,
+                cfg=cfg,
+                image_extensions=image_ext,
+            )
+            timings["object_bank_build"] = time.perf_counter() - stage_start
+            outputs["object_bank"] = object_bank_path.as_posix()
+            artifact_paths["object_bank"] = object_bank_path.as_posix()
+
+        if run_training:
+            stage_start = time.perf_counter()
+            training_cfg = cfg["training"]
+            train_profile_cfg = _resolve_training_profile(training_cfg, profile=train_profile)
+            class_names = _dataset_class_names(cfg=cfg, dataset_root=dataset_root)
+            runtime_data_yaml = _write_runtime_data_yaml(
+                dataset_root=dataset_root,
+                class_names=class_names,
+            )
+            train_cfg = TrainRunConfig(
+                data_yaml=runtime_data_yaml.as_posix(),
+                model=str(training_cfg["model"]),
+                epochs=int(train_profile_cfg["epochs"]),
+                imgsz=int(train_profile_cfg["imgsz"]),
+                batch=int(train_profile_cfg["batch"]),
+                device=training_cfg.get("device"),
+                workers=int(train_profile_cfg["workers"]),
+                fraction=float(train_profile_cfg["fraction"]),
+                project_dir=str(training_cfg["project_dir"]),
+                seed=int(cfg["project"]["seed"]),
+                deterministic=bool(cfg["project"]["deterministic"]),
+                rect=bool(training_cfg.get("rect", False)),
+                multi_scale=bool(train_profile_cfg["multi_scale"]),
+                baseline_disable_albumentations=bool(
+                    training_cfg.get("baseline_disable_albumentations", True)
+                ),
+                require_custom_augmentations=bool(
+                    training_cfg.get("require_custom_augmentations", True)
+                ),
+            )
+            seeds = [int(seed) for seed in training_cfg.get("seeds", [])]
+            if seeds:
+                run_dirs_by_seed = run_mvp_training_suite_multiseed(
+                    config=train_cfg,
+                    seeds=seeds,
+                    baseline_yaml_path="configs/baseline.yaml",
+                    manual_yaml_path="configs/manual.yaml",
+                    adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
+                    run_ablation=bool(training_cfg.get("run_ablation", True)),
+                    object_bank_path=object_bank_path,
+                )
+                outputs["train_runs_by_seed"] = run_dirs_by_seed
+            else:
+                run_dirs = run_mvp_training_suite(
+                    config=train_cfg,
+                    baseline_yaml_path="configs/baseline.yaml",
+                    manual_yaml_path="configs/manual.yaml",
+                    adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
+                    run_ablation=bool(training_cfg.get("run_ablation", True)),
+                    object_bank_path=object_bank_path,
+                )
+                outputs["train_runs"] = run_dirs
+            outputs["runtime_data_yaml"] = runtime_data_yaml.as_posix()
+            outputs["train_profile"] = train_profile
+            artifact_paths["runtime_data_yaml"] = runtime_data_yaml.as_posix()
+            timings["training_suite"] = time.perf_counter() - stage_start
+
+        if run_eval:
+            stage_start = time.perf_counter()
+            class_names = _dataset_class_names(cfg=cfg, dataset_root=dataset_root)
+            if pred_labels_dir is not None:
+                report_run_name = str(eval_run_name or "external_predictions")
+                metrics_by_run = {
+                    report_run_name: _evaluate_prediction_dir(
+                        run_name=report_run_name,
+                        pred_labels_dir=pred_labels_dir,
+                        dataset_root=dataset_root,
+                        image_extensions=image_ext,
+                        class_names=class_names,
+                        cfg=cfg,
+                    )
+                }
+                outputs["pred_labels_dir"] = Path(pred_labels_dir).as_posix()
+            elif auto_predict_for_eval:
+                if eval_run_name is not None:
+                    run_candidates = [eval_run_name]
+                elif "train_runs" in outputs:
+                    run_candidates = list(outputs["train_runs"].keys())
+                else:
+                    run_candidates = [
+                        "baseline",
+                        "manual",
+                        "adaptive",
+                        "adaptive_no_mosaic",
+                        "adaptive_no_custom_albu",
+                    ]
+                metrics_by_run, pred_dirs = _evaluate_training_runs(
+                    cfg=cfg,
                     dataset_root=dataset_root,
                     image_extensions=image_ext,
                     class_names=class_names,
-                    cfg=cfg,
+                    run_names=run_candidates,
                 )
-            }
-            outputs["pred_labels_dir"] = Path(pred_labels_dir).as_posix()
-        elif auto_predict_for_eval:
-            if eval_run_name is not None:
-                run_candidates = [eval_run_name]
-            elif "train_runs" in outputs:
-                run_candidates = list(outputs["train_runs"].keys())
+                outputs["pred_labels_dirs"] = pred_dirs
+                if not metrics_by_run:
+                    raise ValueError(
+                        "No evaluation metrics were produced. Check that run weights exist "
+                        "or pass --pred-labels-dir."
+                    )
             else:
-                run_candidates = [
-                    "baseline",
-                    "manual",
-                    "adaptive",
-                    "adaptive_no_mosaic",
-                    "adaptive_no_custom_albu",
-                ]
-            metrics_by_run, pred_dirs = _evaluate_training_runs(
-                cfg=cfg,
-                dataset_root=dataset_root,
-                image_extensions=image_ext,
-                class_names=class_names,
-                run_names=run_candidates,
-            )
-            outputs["pred_labels_dirs"] = pred_dirs
-            if not metrics_by_run:
                 raise ValueError(
-                    "No evaluation metrics were produced. Check that run weights exist "
-                    "or pass --pred-labels-dir."
+                    "pred_labels_dir must be provided when run_eval=True, "
+                    "or enable auto_predict_for_eval with available run weights."
                 )
-        else:
-            raise ValueError(
-                "pred_labels_dir must be provided when run_eval=True, "
-                "or enable auto_predict_for_eval with available run weights."
+
+            timings["evaluation_suite"] = time.perf_counter() - stage_start
+            run_dirs_for_report = outputs.get("train_runs") if isinstance(outputs.get("train_runs"), dict) else None
+            report_path = build_markdown_report(
+                metrics_by_run,
+                timings=timings,
+                artifact_paths=artifact_paths,
+                run_dirs=run_dirs_for_report,
             )
+            outputs["eval_metrics_by_run"] = metrics_by_run
+            outputs["mvp_report"] = report_path.as_posix()
+            artifact_paths["mvp_report"] = report_path.as_posix()
 
-        timings["evaluation_suite"] = time.perf_counter() - stage_start
-        run_dirs_for_report = outputs.get("train_runs") if isinstance(outputs.get("train_runs"), dict) else None
-        report_path = build_markdown_report(
-            metrics_by_run,
-            timings=timings,
-            artifact_paths=artifact_paths,
-            run_dirs=run_dirs_for_report,
+        outputs["timings"] = timings
+        manifest_path = Path("artifacts/reports/experiment_manifest.json")
+        dump_json(
+            {
+                "project_config": resolved_config_path.as_posix(),
+                "outputs": outputs,
+                "artifacts": artifact_paths,
+                "timings": timings,
+            },
+            manifest_path,
         )
-        outputs["eval_metrics_by_run"] = metrics_by_run
-        outputs["mvp_report"] = report_path.as_posix()
-        artifact_paths["mvp_report"] = report_path.as_posix()
+        outputs["experiment_manifest"] = manifest_path.as_posix()
 
-    outputs["timings"] = timings
-    manifest_path = Path("artifacts/reports/experiment_manifest.json")
-    dump_json(
-        {
-            "project_config": str(project_config_path),
-            "outputs": outputs,
-            "artifacts": artifact_paths,
-            "timings": timings,
-        },
-        manifest_path,
-    )
-    outputs["experiment_manifest"] = manifest_path.as_posix()
-
-    return outputs
+        return outputs
+    finally:
+        os.chdir(cwd_before)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
