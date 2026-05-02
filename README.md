@@ -27,7 +27,7 @@ augmentation selection pipeline for small-object detection, following
 - Experiment manifest with timings, artifact paths, and multi-run COCOeval reports.
 - Optional multi-seed training suite (`training.seeds`) for mean/std replication.
 - Budget-aware AutoAug-like random-search candidate generator for comparison studies.
-- Colab notebook for the main MVP pipeline.
+- Colab notebooks for dataset-specific pipelines and the main MVP pipeline.
 
 ## Repository layout
 
@@ -47,6 +47,7 @@ src/
   pipeline_mvp.py
 notebooks/
   mvp_pipeline_colab.ipynb
+  visdrone_pipeline_colab.ipynb
 tests/
 artifacts/
 runs/
@@ -92,7 +93,8 @@ Notes:
 
 Use notebook:
 
-- `notebooks/mvp_pipeline_colab.ipynb`
+- `notebooks/visdrone_pipeline_colab.ipynb` (preferred VisDrone pipeline, aligned with DOTA/xView/COCO-small notebooks)
+- `notebooks/mvp_pipeline_colab.ipynb` (legacy all-in-one VisDrone notebook with extra bootstrap/hotfix logic)
 - `notebooks/coco_small_pipeline_colab.ipynb` (COCO-small pipeline)
 - `notebooks/autoaug_vs_adaptive_comparison.ipynb` (AutoAug-like search vs this project)
 - `notebooks/visdrone_tiny_fixture_smoke.ipynb` (self-contained VisDrone-like module smoke test, <1 min)
