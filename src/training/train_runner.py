@@ -36,6 +36,10 @@ class TrainRunConfig:
     baseline_disable_albumentations: bool = True
     require_custom_augmentations: bool = True
     plots: bool = False
+    val: bool = True
+    cache: bool | str = False
+    save_period: int = -1
+    patience: int | None = None
 
 
 def _to_yaml_safe(value: Any) -> Any:
@@ -97,9 +101,34 @@ def _default_train_args(config: TrainRunConfig) -> dict[str, Any]:
         "rect": config.rect,
         "multi_scale": config.multi_scale,
         "plots": config.plots,
+        "val": config.val,
+        "cache": config.cache,
+        "save_period": config.save_period,
         "exist_ok": False,
     }
+    if config.patience is not None:
+        args["patience"] = int(config.patience)
     return args
+
+
+def _config_with_mode_overrides(
+    config: TrainRunConfig,
+    mode: str,
+    mode_overrides: dict[str, dict[str, Any]] | None,
+) -> TrainRunConfig:
+    """Return per-mode TrainRunConfig with optional runtime overrides."""
+    if not mode_overrides:
+        return config
+    payload = mode_overrides.get(mode, {})
+    if not isinstance(payload, dict) or not payload:
+        return config
+
+    # Keep only known dataclass fields to avoid accidental unsupported keys.
+    allowed = {field.name for field in fields(TrainRunConfig)}
+    safe_payload = {key: value for key, value in payload.items() if key in allowed}
+    if not safe_payload:
+        return config
+    return replace(config, **safe_payload)
 
 
 def run_train_mode(
@@ -170,6 +199,7 @@ def run_mvp_training_suite(
     adaptive_policy_json_path: str | Path,
     run_ablation: bool = True,
     object_bank_path: str | Path | None = None,
+    mode_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, str]:
     """
     Run baseline, manual, adaptive and two ablations:
@@ -185,21 +215,21 @@ def run_mvp_training_suite(
     run_dirs: dict[str, str] = {}
     run_dirs["baseline"] = run_train_mode(
         mode="baseline",
-        config=config,
+        config=_config_with_mode_overrides(config, "baseline", mode_overrides),
         mode_args=baseline_args,
         custom_augmentations=None,
     ).as_posix()
 
     run_dirs["manual"] = run_train_mode(
         mode="manual",
-        config=config,
+        config=_config_with_mode_overrides(config, "manual", mode_overrides),
         mode_args=manual_args,
         custom_augmentations=None,
     ).as_posix()
 
     run_dirs["adaptive"] = run_train_mode(
         mode="adaptive",
-        config=config,
+        config=_config_with_mode_overrides(config, "adaptive", mode_overrides),
         mode_args=adaptive_policy.get_ultralytics_train_args(),
         custom_augmentations=adaptive_policy.get_albumentations_transforms(
             object_bank=object_bank,
@@ -212,7 +242,7 @@ def run_mvp_training_suite(
         adaptive_args_no_mosaic["mosaic"] = 0.0
         run_dirs["adaptive_no_mosaic"] = run_train_mode(
             mode="adaptive_no_mosaic",
-            config=config,
+            config=_config_with_mode_overrides(config, "adaptive_no_mosaic", mode_overrides),
             mode_args=adaptive_args_no_mosaic,
             custom_augmentations=adaptive_policy.get_albumentations_transforms(
                 object_bank=object_bank,
@@ -222,7 +252,7 @@ def run_mvp_training_suite(
 
         run_dirs["adaptive_no_custom_albu"] = run_train_mode(
             mode="adaptive_no_custom_albu",
-            config=config,
+            config=_config_with_mode_overrides(config, "adaptive_no_custom_albu", mode_overrides),
             mode_args=adaptive_policy.get_ultralytics_train_args(),
             custom_augmentations=None,
         ).as_posix()
@@ -238,6 +268,7 @@ def run_mvp_training_suite_multiseed(
     adaptive_policy_json_path: str | Path,
     run_ablation: bool = True,
     object_bank_path: str | Path | None = None,
+    mode_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, str]]:
     """
     Run the full training suite for several seeds.
@@ -260,6 +291,7 @@ def run_mvp_training_suite_multiseed(
             adaptive_policy_json_path=adaptive_policy_json_path,
             run_ablation=run_ablation,
             object_bank_path=object_bank_path,
+            mode_overrides=mode_overrides,
         )
     return outputs
 

@@ -29,8 +29,9 @@
 27. A Survey of Small Object Detection Based on Deep Learning in Aerial Images [Электронный ресурс]. – Artificial Intelligence Review, 2025. – URL: https://link.springer.com/article/10.1007/s10462-025-11150-9 (дата обращения: 01.05.2026).
 28. Object Detection in Aerial Images Using DOTA Dataset: A Survey [Электронный ресурс]. – International Journal of Applied Earth Observation and Geoinformation, 2024. – URL: https://www.sciencedirect.com/science/article/pii/S1569843224005648 (дата обращения: 01.05.2026).
 29. VISDRONE [Электронный ресурс]. – Официальный сайт соревнования и датасета. – URL: https://aiskyeye.com/ (дата обращения: 01.05.2026).
-30. DOTA [Электронный ресурс]. – Официальный сайт датасета. – URL: https://captain-whu.github.io/DOTA/ (дата обращения: 01.05.2026).
-
-## Источники раздела
-
-- `diploma/source-materials/formatting-rules/правила_оформления_источников.pdf`. Использован для согласования оформления электронных ресурсов и порядка элементов описания. (источник: diploma/source-materials/formatting-rules/правила_оформления_источников.pdf)
+30. Mosaic Transform Example [Электронный ресурс]. – Albumentations Documentation. – URL: https://albumentations.ai/docs/examples/example-mosaic/ (дата обращения: 01.05.2026).
+31. VisDrone [Электронный ресурс]. – Официальная страница иллюстрации датасета. – URL: https://aiskyeye.com/all-2/ (дата обращения: 01.05.2026).
+32. COCO 2017 Object Detection Task [Электронный ресурс]. – Официальная страница соревнования и split-ов COCO 2017. – URL: https://cocodataset.org/dataset/detection-2017.htm (дата обращения: 01.05.2026).
+33. COCO val2017 sample image `000000252219.jpg` [Электронный ресурс]. – Официальный сервер изображений COCO. – URL: http://images.cocodataset.org/val2017/000000252219.jpg (дата обращения: 01.05.2026).
+34. DOTA [Электронный ресурс]. – Официальный сайт датасета. – URL: https://captain-whu.github.io/DOTA/ (дата обращения: 01.05.2026).
+35. SAHI Quick Start [Электронный ресурс]. – Официальная документация SAHI. – URL: https://obss.github.io/sahi/quick-start/ (дата обращения: 01.05.2026).

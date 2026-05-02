@@ -526,7 +526,16 @@ def run_mvp_pipeline(
                 require_custom_augmentations=bool(
                     training_cfg.get("require_custom_augmentations", True)
                 ),
+                val=bool(training_cfg.get("val_during_train", True)),
+                cache=training_cfg.get("cache", False),
+                save_period=int(training_cfg.get("save_period", -1)),
+                patience=(
+                    int(training_cfg["patience"])
+                    if training_cfg.get("patience") is not None
+                    else None
+                ),
             )
+            mode_overrides = training_cfg.get("mode_overrides")
             seeds = [int(seed) for seed in training_cfg.get("seeds", [])]
             if seeds:
                 run_dirs_by_seed = run_mvp_training_suite_multiseed(
@@ -537,6 +546,7 @@ def run_mvp_pipeline(
                     adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
                     run_ablation=bool(training_cfg.get("run_ablation", True)),
                     object_bank_path=object_bank_path,
+                    mode_overrides=mode_overrides if isinstance(mode_overrides, dict) else None,
                 )
                 outputs["train_runs_by_seed"] = run_dirs_by_seed
             else:
@@ -547,6 +557,7 @@ def run_mvp_pipeline(
                     adaptive_policy_json_path="artifacts/policy/policy_adaptive.json",
                     run_ablation=bool(training_cfg.get("run_ablation", True)),
                     object_bank_path=object_bank_path,
+                    mode_overrides=mode_overrides if isinstance(mode_overrides, dict) else None,
                 )
                 outputs["train_runs"] = run_dirs
             outputs["runtime_data_yaml"] = runtime_data_yaml.as_posix()
