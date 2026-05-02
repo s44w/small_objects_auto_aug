@@ -39,7 +39,7 @@
 **Не указан параметр, который требуется в ТЗ как конфиг‑переменная**  
 Ниже параметры помечены как **«не указан»** и должны быть вынесены в `project_config.yaml` (или `settings.py`) с дефолтами:
 
-- Модель Ultralytics (например `yolo26n.pt` / `yolo11n.pt`) — **не указан**; дефолт для MVP: `yolo26n.pt` (как в примерах Ultralytics). citeturn4view0turn5view0  
+- Модель Ultralytics (например `yolo11s.pt`) — для текущего проекта зафиксирована как `yolo11s.pt`. citeturn4view0turn5view0  
 - Бюджет обучения (epochs/imgsz/batch/device) — **не указан**; дефолт MVP: быстрый этап (epochs=20, imgsz=640) и финальный (epochs=100, imgsz=640/960). VisDrone‑пример в документации использует imgsz=640 и 100 эпох как типовой сценарий. citeturn5view0  
 - “tiny” порог (для tiny_ratio и отдельных метрик) — **не указан**; дефолт MVP: `tiny_area <= 16^2` (256 px²) как под‑диапазон внутри small (только для внутренних отчётов; AP_small остаётся COCO‑каноничным). COCOeval встроенного “tiny” не имеет, поэтому это будет кастомная метрика/доп. прогон. citeturn6view0  
 - Метрика дисбаланса классов (кроме small‑variant) — **не указан**; дефолт MVP: `imbalance_ratio = max_count / max(1, min_count)` по **числу объектов**. Альтернативы (Gini/entropy) — в backlog.  

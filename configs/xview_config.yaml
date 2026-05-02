@@ -110,7 +110,7 @@ policy:
   bbox_copy_paste_max_pastes: 3
 
 training:
-  model: "yolo11n.pt"
+  model: "yolo11s.pt"
   data_yaml: "./datasets/xview_yolo/xview.yaml"
   epochs_fast: 10
   epochs_final: 80

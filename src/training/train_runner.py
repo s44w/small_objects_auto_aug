@@ -21,7 +21,7 @@ class TrainRunConfig:
     """Common train arguments shared across baseline/manual/adaptive runs."""
 
     data_yaml: str
-    model: str = "yolo11n.pt"
+    model: str = "yolo11s.pt"
     epochs: int = 100
     imgsz: int = 640
     batch: int = 16
@@ -299,7 +299,7 @@ def run_mvp_training_suite_multiseed(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run MVP training modes.")
     parser.add_argument("--data-yaml", type=str, required=True)
-    parser.add_argument("--model", type=str, default="yolo11n.pt")
+    parser.add_argument("--model", type=str, default="yolo11s.pt")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)

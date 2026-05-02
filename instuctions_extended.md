@@ -430,7 +430,7 @@ flowchart TD
 ```yaml
 # configs/adaptive_plus.yaml
 task: detect
-model: yolo26n.pt
+model: yolo11s.pt
 imgsz: 640
 epochs: 100
 seed: 0
