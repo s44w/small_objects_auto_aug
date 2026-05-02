@@ -12,7 +12,7 @@
 
 Сформированные по этим данным флаги подтверждают ожидаемое поведение rule engine. В `decision_report.json` для smoke-сценария зафиксированы `is_small_heavy = true`, `is_dense = true`, `is_low_variability = true`, при этом `is_illum_var_high = false` и `is_small_imbalanced = false`. На этой основе adaptive policy увеличивает `mosaic` с `0.3` до `0.7`, а также уменьшает `degrees`, `translate` и `scale` по правилу `R_geom_small_safe`. (источник проекта: artifacts/visdrone_tiny_fixture_smoke_cli/policy/decision_report.json; artifacts/visdrone_tiny_fixture_smoke_cli/policy/policy_adaptive.json; docs/AUGMENTATION_POLICY.md)
 
-Таблица 6 - Ключевые статистики smoke-датасета и соответствующие им решения adaptive policy. (источник проекта: artifacts/visdrone_tiny_fixture_smoke_cli/stats/dataset_stats.json; artifacts/visdrone_tiny_fixture_smoke_cli/policy/decision_report.json)
+Таблица 8 - Ключевые статистики smoke-датасета и соответствующие им решения adaptive policy. (источник проекта: artifacts/visdrone_tiny_fixture_smoke_cli/stats/dataset_stats.json; artifacts/visdrone_tiny_fixture_smoke_cli/policy/decision_report.json)
 
 | Показатель | Значение train | Значение val | Интерпретация для adaptive policy |
 |---|---:|---:|---|
@@ -29,7 +29,7 @@
 
 Сопоставление политик аугментации показывает устойчивое различие между режимами без аугментаций, с простыми аугментациями, с ручной small-object policy, с adaptive policy и с budget-aware AutoAug-like comparator. В качестве целевого критерия рассматривается прежде всего `AP_small`, тогда как `AP@[0.5:0.95]` используется как общий показатель качества детектора. [1, 8, 11] (источник проекта: docs/DATASET_ANALYTICS.md; src/evaluation/coco_eval_runner.py; src/evaluation/metrics_report.py)
 
-Таблица 7 - Результаты сравнения основных сценариев обучения на small-object-heavy выборке. (источник проекта: docs/AUGMENTATION_POLICY.md; configs/baseline.yaml; configs/manual.yaml; src/experiments/autoaug_search.py; [3]; [4])
+Таблица 9 - Результаты сравнения основных сценариев обучения на small-object-heavy выборке. (источник проекта: docs/AUGMENTATION_POLICY.md; configs/baseline.yaml; configs/manual.yaml; src/experiments/autoaug_search.py; [3]; [4])
 
 | Сценарий | `AP_small` | `AP_tiny` | `AP@[0.5:0.95]` | Интерпретация |
 |---|---:|---:|---:|---|
@@ -55,7 +55,7 @@
 
 Ablation-анализ строится вокруг двух явно реализованных вариантов: `adaptive_no_mosaic` и `adaptive_no_custom_albu`. Первый позволяет оценить вклад мозаичной аугментации в плотных сценах, а второй отделяет вклад scalar-параметров adaptive policy от вклада пользовательских преобразований `BBoxAwareCrop`, `BBoxCopyPaste` и object bank. (источник проекта: src/training/train_runner.py; docs/AUGMENTATION_POLICY.md)
 
-Таблица 8 - Результаты ablation-экспериментов относительно полного adaptive-режима. (источник проекта: src/training/train_runner.py; docs/AUGMENTATION_POLICY.md; src/augmentation/albumentations_transforms.py)
+Таблица 10 - Результаты ablation-экспериментов относительно полного adaptive-режима. (источник проекта: src/training/train_runner.py; docs/AUGMENTATION_POLICY.md; src/augmentation/albumentations_transforms.py)
 
 | Сценарий | `AP_small` | `AP_tiny` | `AP@[0.5:0.95]` | Интерпретация |
 |---|---:|---:|---:|---|
@@ -73,7 +73,7 @@ Ablation-анализ строится вокруг двух явно реали
 
 По итоговым метрикам AutoAug-like comparator демонстрирует близкий к adaptive policy результат, однако уступает ему по `AP_small` и `AP_tiny`. Это означает, что даже при более широком пространстве поиска budget-aware random-search не дает принципиального выигрыша над rule-based adaptive policy, тогда как вычислительная цена такого сравнения и слабая интерпретируемость итоговой конфигурации оказываются выше. (источник проекта: src/experiments/autoaug_search.py; docs/AUGMENTATION_POLICY.md; [3]; [4])
 
-Таблица 9 - Сопоставление adaptive policy и budget-aware AutoAug-like подхода. (источник проекта: src/experiments/autoaug_search.py; docs/AUGMENTATION_POLICY.md; [3]; [4])
+Таблица 11 - Сопоставление adaptive policy и budget-aware AutoAug-like подхода. (источник проекта: src/experiments/autoaug_search.py; docs/AUGMENTATION_POLICY.md; [3]; [4])
 
 | Критерий | Adaptive policy | Budget-aware AutoAug-like |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Реферат
 
-Выпускная квалификационная работа бакалавра содержит 7 рисунков, 9 таблиц и 35 использованных источников. (источник проекта: diploma/text/00b-abbreviations.md; diploma/text/02-review.md; diploma/text/04-architecture.md; diploma/text/05-implementation.md; diploma/text/06-experimental-design.md; diploma/text/07-experiments.md; diploma/text/09-references.md)
+Выпускная квалификационная работа бакалавра содержит 7 рисунков, 11 таблиц и 35 использованных источников. (источник проекта: diploma/text/00b-abbreviations.md; diploma/text/02-review.md; diploma/text/04-architecture.md; diploma/text/05-implementation.md; diploma/text/06-experimental-design.md; diploma/text/07-experiments.md; diploma/text/09-references.md)
 
 Ключевые слова: ДЕТЕКЦИЯ МАЛЫХ ОБЪЕКТОВ, АУГМЕНТАЦИЯ, ADAPTIVE POLICY, COCOEVAL, VISDRONE, YOLO, ALBUMENTATIONS, OBJECT BANK. (источник проекта: README.md; diploma/docs/narrative.md; diploma/docs/glossary.md)
 

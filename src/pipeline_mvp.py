@@ -112,28 +112,28 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
     profile_norm = str(profile).strip().lower()
     if profile_norm == "fast":
         return {
-            "epochs": int(training_cfg.get("epochs_fast", 20)),
+            "epochs": int(training_cfg.get("epochs_fast", 25)),
             "imgsz": int(training_cfg.get("imgsz", 960)),
-            "batch": int(training_cfg.get("batch_fast", min(8, int(training_cfg.get("batch", 16))))),
-            "workers": int(training_cfg.get("workers_fast", min(2, int(training_cfg.get("workers", 4))))),
-            "fraction": float(training_cfg.get("fraction_fast", 0.2)),
+            "batch": int(training_cfg.get("batch_fast", training_cfg.get("batch", 6))),
+            "workers": int(training_cfg.get("workers_fast", training_cfg.get("workers", 2))),
+            "fraction": float(training_cfg.get("fraction_fast", 1.0)),
             "multi_scale": bool(training_cfg.get("multi_scale_fast", False)),
         }
     if profile_norm == "final":
         return {
-            "epochs": int(training_cfg.get("epochs_final", 100)),
+            "epochs": int(training_cfg.get("epochs_final", 25)),
             "imgsz": int(training_cfg.get("imgsz", 960)),
-            "batch": int(training_cfg.get("batch", 16)),
-            "workers": int(training_cfg.get("workers", 4)),
+            "batch": int(training_cfg.get("batch", 6)),
+            "workers": int(training_cfg.get("workers", 2)),
             "fraction": float(training_cfg.get("fraction_final", 1.0)),
             "multi_scale": bool(training_cfg.get("multi_scale", False)),
         }
 
     notebook_presets: dict[str, dict[str, Any]] = {
         "balanced": {
-            "epochs": 15,
+            "epochs": 25,
             "imgsz": 960,
-            "batch": 8,
+            "batch": 6,
             "workers": 2,
             "fraction": 1.0,
             "multi_scale": False,
@@ -141,13 +141,13 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
         "quality": {
             "epochs": 25,
             "imgsz": 960,
-            "batch": 8,
+            "batch": 6,
             "workers": 2,
             "fraction": 1.0,
             "multi_scale": False,
         },
         "hour": {
-            "epochs": 40,
+            "epochs": 25,
             "imgsz": 960,
             "batch": 6,
             "workers": 2,
@@ -155,9 +155,9 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
             "multi_scale": False,
         },
         "max_quality": {
-            "epochs": 60,
+            "epochs": 25,
             "imgsz": 960,
-            "batch": 4,
+            "batch": 6,
             "workers": 2,
             "fraction": 1.0,
             "multi_scale": False,

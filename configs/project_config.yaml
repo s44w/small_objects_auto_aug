@@ -55,14 +55,14 @@ policy:
 training:
   model: "yolo11s.pt"
   data_yaml: "./datasets/visdrone_yolo/visdrone.yaml"
-  epochs_fast: 20
-  epochs_final: 100
+  epochs_fast: 25
+  epochs_final: 25
   fraction_final: 1.0
   imgsz: 960
-  batch: 16
+  batch: 6
   device: null
-  workers: 4
-  fraction_fast: 0.2
+  workers: 2
+  fraction_fast: 1.0
   project_dir: "./runs"
   run_ablation: true
   baseline_disable_albumentations: true

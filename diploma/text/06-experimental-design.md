@@ -28,9 +28,9 @@
 
 Для сценария проверки подготовки `COCO-small` в репозитории дополнительно зафиксирован `coco_small_manager_case`: в train-части присутствует `1` изображение с `2` релевантными объектами, из которых `1` удовлетворяет критерию `small`, а в val-части - `1` изображение с `1` малым объектом; в итоговом YOLO-выводе сохраняются только малые экземпляры. Этот `fixture` не заменяет полный `COCO-small` benchmark, но подтверждает корректность процедуры фильтрации и конвертации разметки. [1, 8, 11, 32] (источник проекта: artifacts/_test_tmp/coco_small_manager_case/yolo/coco_small_prepare_report.json; src/data/coco_small_manager.py)
 
-Сводные характеристики внешних наборов и локальных воспроизводимых поднаборов приведены в таблице 4. [1, 2, 6, 8, 11, 29, 32]
+Сводные характеристики внешних наборов и локальных воспроизводимых поднаборов приведены в таблице 5. [1, 2, 6, 8, 11, 29, 32]
 
-Таблица 4 - Основные характеристики датасетов и поднаборов, используемых в экспериментальной части. [1, 2, 6, 8, 11, 29, 32] (источник проекта: configs/project_config.yaml; configs/coco_small_config.yaml; artifacts/visdrone_tiny_fixture_smoke_cli/stats/dataset_stats.json; artifacts/_test_tmp/coco_small_manager_case/yolo/coco_small_prepare_report.json)
+Таблица 5 - Основные характеристики датасетов и поднаборов, используемых в экспериментальной части. [1, 2, 6, 8, 11, 29, 32] (источник проекта: configs/project_config.yaml; configs/coco_small_config.yaml; artifacts/visdrone_tiny_fixture_smoke_cli/stats/dataset_stats.json; artifacts/_test_tmp/coco_small_manager_case/yolo/coco_small_prepare_report.json)
 
 | Набор данных | Роль в работе | Размер и split-ы | Классы и сцена | Малые объекты и важные характеристики |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@
 
 Центральным элементом экспериментального плана является сравнение нескольких режимов обучения, запускаемых в рамках единого training suite. В базовой схеме проекта предусмотрены режимы `baseline`, `manual`, `adaptive`, `adaptive_no_mosaic` и `adaptive_no_custom_albu`, что позволяет сопоставлять как полный rule-based подход, так и отдельные его компоненты. (источник проекта: README.md; src/training/train_runner.py; docs/AUGMENTATION_POLICY.md)
 
-Таблица 5 - Сравниваемые режимы обучения в экспериментальном плане. (источник проекта: README.md; src/training/train_runner.py; configs/baseline.yaml; configs/manual.yaml)
+Таблица 6 - Сравниваемые режимы обучения в экспериментальном плане. (источник проекта: README.md; src/training/train_runner.py; configs/baseline.yaml; configs/manual.yaml)
 
 | Режим | Назначение | Что показывает |
 |---|---|---|
@@ -76,6 +76,30 @@
 
 С практической точки зрения критерии интерпретации можно сформулировать следующим образом: adaptive policy считается успешной, если она улучшает `AP_small` относительно `baseline` и `manual`, не вызывает резкого ухудшения общей mAP и при этом сохраняет интерпретируемость через `decision_report.json`. Для ablation-сценариев основным вопросом становится вклад каждого отключаемого компонента в итоговый прирост качества. (источник проекта: docs/AUGMENTATION_POLICY.md; src/policy/rule_engine.py; src/evaluation/metrics_report.py)
 
+Выбор `AP_small` в качестве центральной метрики объясняется самой конструкцией COCOeval: категория `small` соответствует объектам с площадью менее `32^2` пикселей на исходном изображении, и именно этот диапазон наиболее близок к практической постановке dense UAV- и aerial-сцен. В обзорах по small object detection подчеркивается, что усредненная mAP по всем масштабам недостаточно чувствительна к качеству на действительно мелких целях, поэтому отдельный анализ `AP_small` и `AR_small` необходим, если предметом исследования является именно детекция малых объектов, а не общий object detection. [1, 8, 26, 27] (источник проекта: docs/DATASET_ANALYTICS.md; src/evaluation/coco_eval_runner.py)
+
+Метрика `AR_small` используется в паре с `AP_small`, поскольку она позволяет отделять проблемы ранжирования и локализации от проблемы пропуска объектов. Для малых целей это особенно важно: модель может демонстрировать приемлемую precision на немногочисленных уверенных детекциях, но при этом пропускать значительную долю экземпляров в плотных сценах. Поэтому интерпретация результатов только по `AP_small` была бы недостаточной, а совместный анализ `AP_small` и `AR_small` лучше отражает фактическую полезность adaptive policy. [1, 8, 26] (источник проекта: src/evaluation/coco_eval_runner.py; src/evaluation/metrics_report.py)
+
+Сохранение в анализе метрик `AP@[0.5:0.95]`, `AP50` и `AP75` также не является формальностью. `AP50` чувствительна к факту обнаружения при более мягком требовании к локализации, тогда как `AP75` строже оценивает точность позиционирования рамки. Для малых объектов это различие методически важно, потому что часть аугментаций может повышать общую обнаружимость объекта, но одновременно ухудшать точность его локализации после ресайза, crop или mosaic-смешивания. Если adaptive policy улучшает `AP_small`, но заметно просаживает `AP75`, это означает, что выигрыш может достигаться ценой менее аккуратной локализации. [1, 8, 26, 27] (источник проекта: src/evaluation/coco_eval_runner.py; src/evaluation/metrics_report.py)
+
+Проектная метрика `AP_tiny` введена не как замена COCOeval, а как дополнительный диагностический индикатор для объектов площадью до `16^2` пикселей. Такой выбор соответствует внутренней задаче более тонкого разделения extremely small и simply small объектов. Порог `16^2` не является стандартом COCO, но он удобен как инженерное расширение, потому что позволяет отдельно отслеживать поведение модели на наиболее сложной части распределения, где даже небольшое усиление scale-safe аугментации или тайлинга может давать заметный эффект. [8, 10, 25, 26] (источник проекта: docs/THRESHOLDS.md; src/evaluation/coco_eval_runner.py)
+
+Для практической интерпретации результатов в данной работе принято следующее правило. Политика считается удачной, если улучшение `AP_small` является устойчивым относительно `baseline` и `manual`, изменение `AR_small` подтверждает, что прирост не сводится только к переоценке небольшого числа детекций, а общая `AP@[0.5:0.95]` не испытывает резкой деградации. Иными словами, приоритетной является не максимизация одной цифры любой ценой, а достижение баланса между чувствительностью к малым объектам, стабильностью общей детекции и интерпретируемостью выбранной policy. [4, 8, 26, 27] (источник проекта: docs/AUGMENTATION_POLICY.md; src/evaluation/metrics_report.py; src/policy/rule_engine.py)
+
+Сводная логика выбора метрик приведена в таблице 7. [1, 8, 26, 27] (источник проекта: src/evaluation/coco_eval_runner.py; docs/THRESHOLDS.md)
+
+Таблица 7 - Основные метрики экспериментальной части и причины их выбора для задачи детекции малых объектов. [1, 8, 26, 27] (источник проекта: src/evaluation/coco_eval_runner.py; docs/THRESHOLDS.md)
+
+| Метрика | Статус в работе | Почему выбрана |
+|---|---|---|
+| `AP_small` | Основная целевая метрика | Стандартная COCO-метрика для объектов площадью до `32^2`, напрямую соответствует предмету исследования |
+| `AR_small` | Основная вспомогательная метрика | Показывает, не сопровождается ли рост `AP_small` пропуском части малых объектов |
+| `AP@[0.5:0.95]` | Обязательная контрольная метрика | Нужна для проверки, что выигрыш на малых объектах не разрушает общее качество детектора |
+| `AP50` | Контроль обнаружимости | Отражает факт нахождения объекта при более мягком IoU-критерии |
+| `AP75` | Контроль точности локализации | Помогает увидеть, не ухудшилась ли аккуратность рамок после аугментации |
+| `AP_medium`, `AP_large` | Балансирующие метрики | Нужны для контроля влияния adaptive policy на объекты других масштабов |
+| `AP_tiny` | Проектная диагностическая метрика | Отдельно отслеживает объекты площадью до `16^2`, наиболее уязвимые к агрессивной геометрии |
+
 ## Угрозы валидности
 
 Одной из ключевых угроз валидности является ограниченность вычислительного бюджета. Поскольку training suite включает несколько режимов, а также потенциально допускает multi-seed и AutoAug-like сравнения, слишком короткие профили обучения могут исказить относительное качество режимов, тогда как слишком тяжелые профили затрудняют повторяемость экспериментов и усложняют практическое использование конвейера. (источник проекта: src/pipeline_mvp.py; src/training/train_runner.py; README.md)
@@ -91,6 +115,8 @@
 - `[1]` COCO: Common Objects in Context. Использован для описания COCO как базового датасета и общей постановки задачи. URL: https://arxiv.org/abs/1405.0312
 - `[2]` Vision Meets Drones: A Challenge. Использован для описания бенчмарка VisDrone и его прикладных характеристик. URL: https://arxiv.org/abs/1804.07437
 - `[3]` AutoAugment: Learning Augmentation Policies from Data. Использован для описания search-based подходов к выбору аугментаций. URL: https://arxiv.org/abs/1805.09501
+- `[4]` Scale-Aware Automatic Augmentation for Object Detection. Использован для обоснования приоритета scale-aware метрик и ограничений в small-object сценарии. URL: https://arxiv.org/abs/2103.16119
+- `[5]` Ultralytics YOLO Data Augmentation Guide. Использован для связи экспериментальных критериев с типами аугментаций, сравниваемых в training suite. URL: https://docs.ultralytics.com/guides/yolo-data-augmentation/
 - `[6]` Ultralytics VisDrone Dataset Guide. Использован для описания split-ов и классов детекционного сценария VisDrone. URL: https://docs.ultralytics.com/datasets/detect/visdrone/
 - `[8]` pycocotools COCOeval. Использован для описания COCO-совместимого критерия `small objects`. URL: https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/cocoeval.py
 - `[11]` COCO - Common Objects in Context. Использован как официальный источник сведений о датасете COCO. URL: https://cocodataset.org/index.htm
@@ -98,6 +124,9 @@
 - `[19]` xView: Objects in Context in Overhead Imagery. Использован для описания возможного сценария переноса на overhead imagery. URL: https://arxiv.org/abs/1802.07856
 - `[21]` RandAugment: Practical Automated Data Augmentation with a Reduced Search Space. Использован для описания упрощенных search-based подходов. URL: https://arxiv.org/abs/1909.13719
 - `[23]` Faster AutoAugment: Learning Augmentation Strategies Using Backpropagation. Использован для описания более эффективных процедур поиска augmentation policy. URL: https://arxiv.org/abs/1911.06987
+- `[25]` Slicing Aided Hyper Inference and Fine-tuning for Small Object Detection. Использован для обоснования проектной диагностики `AP_tiny` и работы с extremely small objects. URL: https://arxiv.org/abs/2202.06934
+- `[26]` Small Object Detection Based on Deep Learning for Remote Sensing: A Comprehensive Review. Использован для объяснения, почему общая mAP недостаточна без отдельного анализа малых объектов. URL: https://www.mdpi.com/2072-4292/15/13/3265
+- `[27]` A Survey of Small Object Detection Based on Deep Learning in Aerial Images. Использован для обоснования выбора `AP_small` и `AR_small` как центральных метрик. URL: https://link.springer.com/article/10.1007/s10462-025-11150-9
 - `[29]` VISDRONE. Использован как официальный источник сведений о датасете и challenge-сценарии. URL: https://aiskyeye.com/
 - `[31]` VisDrone. Использован как официальный источник иллюстраций датасета. URL: https://aiskyeye.com/all-2/
 - `[32]` COCO 2017 Object Detection Task. Использован как официальный источник сведений о детекционных split-ах COCO 2017. URL: https://cocodataset.org/dataset/detection-2017.htm

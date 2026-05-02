@@ -112,14 +112,14 @@ policy:
 training:
   model: "yolo11s.pt"
   data_yaml: "./datasets/xview_yolo/xview.yaml"
-  epochs_fast: 10
-  epochs_final: 80
+  epochs_fast: 25
+  epochs_final: 25
   fraction_final: 1.0
   imgsz: 960
-  batch: 8
+  batch: 6
   device: null
   workers: 2
-  fraction_fast: 0.15
+  fraction_fast: 1.0
   project_dir: "./runs"
   run_ablation: true
   baseline_disable_albumentations: true
