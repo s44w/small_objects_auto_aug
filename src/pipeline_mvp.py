@@ -113,7 +113,7 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
     if profile_norm == "fast":
         return {
             "epochs": int(training_cfg.get("epochs_fast", 20)),
-            "imgsz": int(training_cfg.get("imgsz", 640)),
+            "imgsz": int(training_cfg.get("imgsz", 960)),
             "batch": int(training_cfg.get("batch_fast", min(8, int(training_cfg.get("batch", 16))))),
             "workers": int(training_cfg.get("workers_fast", min(2, int(training_cfg.get("workers", 4))))),
             "fraction": float(training_cfg.get("fraction_fast", 0.2)),
@@ -122,7 +122,7 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
     if profile_norm == "final":
         return {
             "epochs": int(training_cfg.get("epochs_final", 100)),
-            "imgsz": int(training_cfg.get("imgsz", 640)),
+            "imgsz": int(training_cfg.get("imgsz", 960)),
             "batch": int(training_cfg.get("batch", 16)),
             "workers": int(training_cfg.get("workers", 4)),
             "fraction": float(training_cfg.get("fraction_final", 1.0)),
@@ -132,7 +132,7 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
     notebook_presets: dict[str, dict[str, Any]] = {
         "balanced": {
             "epochs": 15,
-            "imgsz": 768,
+            "imgsz": 960,
             "batch": 8,
             "workers": 2,
             "fraction": 1.0,
@@ -140,7 +140,7 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
         },
         "quality": {
             "epochs": 25,
-            "imgsz": 896,
+            "imgsz": 960,
             "batch": 8,
             "workers": 2,
             "fraction": 1.0,
@@ -156,7 +156,7 @@ def _resolve_training_profile(training_cfg: dict, profile: str) -> dict[str, Any
         },
         "max_quality": {
             "epochs": 60,
-            "imgsz": 1024,
+            "imgsz": 960,
             "batch": 4,
             "workers": 2,
             "fraction": 1.0,
@@ -308,7 +308,7 @@ def _evaluate_training_runs(
             images_dir=dataset_root / "images" / "val",
             output_project=runs_root / "eval_predict",
             run_name=run_name,
-            imgsz=int(cfg["evaluation"].get("imgsz", cfg["training"].get("imgsz", 640))),
+            imgsz=int(cfg["evaluation"].get("imgsz", cfg["training"].get("imgsz", 960))),
             device=cfg["training"].get("device", 0),
             use_tta=bool(cfg["evaluation"].get("use_tta", True)),
         )

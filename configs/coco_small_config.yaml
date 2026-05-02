@@ -134,7 +134,7 @@ training:
   epochs_fast: 10
   epochs_final: 80
   fraction_final: 1.0
-  imgsz: 640
+  imgsz: 960
   batch: 16
   device: null
   workers: 4

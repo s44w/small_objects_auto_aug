@@ -23,7 +23,7 @@ class TrainRunConfig:
     data_yaml: str
     model: str = "yolo11s.pt"
     epochs: int = 100
-    imgsz: int = 640
+    imgsz: int = 960
     batch: int = 16
     device: str | int | None = None
     workers: int = 4
@@ -301,7 +301,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-yaml", type=str, required=True)
     parser.add_argument("--model", type=str, default="yolo11s.pt")
     parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--imgsz", type=int, default=640)
+    parser.add_argument("--imgsz", type=int, default=960)
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--workers", type=int, default=4)
