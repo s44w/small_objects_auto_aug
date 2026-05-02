@@ -53,7 +53,7 @@ policy:
   bbox_copy_paste_max_pastes: 3
 
 training:
-  model: "yolo26n.pt"
+  model: "yolo11n.pt"
   data_yaml: "./datasets/visdrone_yolo/visdrone.yaml"
   epochs_fast: 20
   epochs_final: 100
