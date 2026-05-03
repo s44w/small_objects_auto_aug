@@ -19,7 +19,6 @@ OUTPUT_PATH = ROOT / "output" / "VKR_small_objects_auto_aug_full.docx"
 CHAPTERS = [
     ROOT / "text" / "00-titlepage.md",
     ROOT / "text" / "00a-referat.md",
-    ROOT / "text" / "00b-abbreviations.md",
     ROOT / "text" / "00c-contents.md",
     ROOT / "text" / "01-intro.md",
     ROOT / "text" / "02-review.md",

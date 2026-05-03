@@ -16,7 +16,6 @@ TEMPLATE_REL="template/blank-template.docx"
 CHAPTERS=(
     "text/00-titlepage.md"
     "text/00a-referat.md"
-    "text/00b-abbreviations.md"
     "text/00c-contents.md"
     "text/01-intro.md"
     "text/02-review.md"
