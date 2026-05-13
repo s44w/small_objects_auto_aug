@@ -22,13 +22,13 @@ CHAPTERS = [
     ROOT / "text" / "00c-contents.md",
     ROOT / "text" / "01-intro.md",
     ROOT / "text" / "02-review.md",
-    ROOT / "text" / "03-requirements.md",
     ROOT / "text" / "04-architecture.md",
     ROOT / "text" / "05-implementation.md",
     ROOT / "text" / "06-experimental-design.md",
-    ROOT / "text" / "07-experiments.md",
     ROOT / "text" / "08-conclusion.md",
     ROOT / "text" / "09-references.md",
+    ROOT / "text" / "10-appendix-a.md",
+    ROOT / "text" / "11-appendix-b.md",
 ]
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"

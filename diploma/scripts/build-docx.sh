@@ -19,11 +19,9 @@ CHAPTERS=(
     "text/00c-contents.md"
     "text/01-intro.md"
     "text/02-review.md"
-    "text/03-requirements.md"
     "text/04-architecture.md"
     "text/05-implementation.md"
     "text/06-experimental-design.md"
-    "text/07-experiments.md"
     "text/08-conclusion.md"
     "text/09-references.md"
 )

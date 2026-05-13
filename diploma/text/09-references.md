@@ -24,5 +24,5 @@
 22. VISDRONE [Электронный ресурс]. - Официальный сайт датасета. - URL: https://aiskyeye.com/ (дата обращения: 02.05.2026).
 23. COCO 2017 Object Detection Task [Электронный ресурс]. - Официальный сайт. - URL: https://cocodataset.org/dataset/detection-2017.htm (дата обращения: 02.05.2026).
 24. DOTA: A Large-Scale Dataset for Object Detection in Aerial Images [Электронный ресурс]. - CVPR 2018. - URL: https://doi.org/10.1109/CVPR.2018.00418 (дата обращения: 02.05.2026).
-25. xView: Objects in Context in Overhead Imagery [Электронный ресурс]. - arXiv, 2018. - URL: https://arxiv.org/abs/1802.07856 (дата обращения: 02.05.2026).
+25. DOTA [Электронный ресурс]. - Официальный сайт датасета. - URL: https://captain-whu.github.io/DOTA/ (дата обращения: 02.05.2026).
 26. Small Object Detection Based on Deep Learning for Remote Sensing: A Comprehensive Review [Электронный ресурс]. - Remote Sensing, 2023. - URL: https://www.mdpi.com/2072-4292/15/13/3265 (дата обращения: 02.05.2026).

@@ -13,6 +13,7 @@ pytest-cache-files-*/
 .nox/
 .venv/
 
+diploma/
 # Experiment artifacts
 artifacts/
 runs/

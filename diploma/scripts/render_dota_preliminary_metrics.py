@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "images" / "dota-preliminary-metrics.png"
+OUTPUT_CLASSWISE = ROOT / "images" / "dota-classwise-comparison.png"
 
 
 def main() -> None:
@@ -105,7 +106,27 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUTPUT, dpi=220, bbox_inches="tight")
     plt.close(fig)
+
+    classes = ["plane", "ship", "harbor", "large-vehicle", "small-vehicle", "tennis-court", "bridge"]
+    baseline = [0.279, 0.166, 0.217, 0.343, 0.168, 0.681, 0.000]
+    adaptive = [0.378, 0.255, 0.299, 0.502, 0.269, 0.774, 0.015]
+
+    fig, ax = plt.subplots(figsize=(10.8, 5.8), constrained_layout=True)
+    x = range(len(classes))
+    width = 0.34
+    ax.bar([i - width / 2 for i in x], baseline, width=width, label="baseline", color="#7a9cc6")
+    ax.bar([i + width / 2 for i in x], adaptive, width=width, label="adaptive", color="#f28e2b")
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(classes, rotation=18)
+    ax.set_ylabel("mAP50-95")
+    ax.set_ylim(0.0, 0.82)
+    ax.set_title("Поклассовое сравнение baseline и adaptive на DOTA")
+    ax.legend()
+    fig.savefig(OUTPUT_CLASSWISE, dpi=220, bbox_inches="tight")
+    plt.close(fig)
+
     print(OUTPUT)
+    print(OUTPUT_CLASSWISE)
 
 
 if __name__ == "__main__":

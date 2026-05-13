@@ -32,8 +32,10 @@
 - `text/04-architecture.md` опирается на `src/pipeline_mvp.py` и модульную структуру `src/`.
 - `text/05-implementation.md` опирается на код в `src/data`, `src/analysis`, `src/policy`,
   `src/augmentation`, `src/training`, `src/evaluation`, `src/experiments`, `src/utils`.
-- `text/06-experimental-design.md` и `text/07-experiments.md` опираются на `configs/`,
-  `tests/`, `docs/` и ноутбуки `notebooks/`.
+- `text/02-review.md` теперь объединяет обзорную и постановочную части и опирается на
+  внешние источники, а также на постановочные материалы проекта.
+- `text/06-experimental-design.md` теперь объединяет план, проведение и результаты
+  экспериментов и опирается на `configs/`, `tests/`, `docs/` и ноутбуки `notebooks/`.
 
 ## Куда складывать материалы
 
